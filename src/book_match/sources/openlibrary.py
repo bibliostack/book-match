@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 try:
     import httpx
 except ImportError:
-    httpx = None
+    httpx = None  # type: ignore[assignment]
 
 # Valid OpenLibrary key patterns: /works/OL123W, /books/OL123M, etc.
 _SAFE_OL_ID_PATTERN = re.compile(r"^/?(?:works|books|editions|authors)/OL\d+[AMWC]$")

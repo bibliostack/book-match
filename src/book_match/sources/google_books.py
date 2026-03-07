@@ -22,7 +22,7 @@ _MAX_RETRY_AFTER = 300  # 5 minutes max
 try:
     import httpx
 except ImportError:
-    httpx = None
+    httpx = None  # type: ignore[assignment]
 
 # Only allow alphanumeric, hyphens, and underscores in source IDs
 _SAFE_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")
