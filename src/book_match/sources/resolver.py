@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+from collections.abc import Sequence
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any
 
 from book_match.core.types import Book, MatchResult, SearchQuery
+from book_match.isbn.normalize import normalize_isbn
 from book_match.matching.engine import BookMatcher
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -72,9 +77,7 @@ class BookResolver:
         try:
             return await source.search(query, limit=limit)
         except Exception as e:
-            # Log error but don't fail the entire resolve
-            # In production, you'd use proper logging
-            print(f"Warning: {source.name} query failed: {e}")
+            logger.warning("Source '%s' query failed: %s", source.name, e)
             return []
 
     async def resolve(
@@ -183,10 +186,11 @@ class BookResolver:
         Returns:
             List of MatchResults
         """
-        # Create minimal book with just ISBN
+        # Normalize ISBN (strip hyphens/spaces) before classifying
+        clean_isbn = normalize_isbn(isbn) or isbn
         book = Book(
-            isbn_10=isbn if len(isbn) == 10 else None,
-            isbn_13=isbn if len(isbn) == 13 else None,
+            isbn_10=clean_isbn if len(clean_isbn) == 10 else None,
+            isbn_13=clean_isbn if len(clean_isbn) == 13 else None,
         )
 
         # Query sources for ISBN
@@ -249,7 +253,9 @@ class BookResolver:
         """Close all source connections."""
         for source in self.sources:
             if hasattr(source, "close"):
-                await source.close()
+                result = source.close()
+                if asyncio.iscoroutine(result) or asyncio.isfuture(result):
+                    await result
 
     async def __aenter__(self) -> BookResolver:
         return self

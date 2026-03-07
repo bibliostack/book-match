@@ -30,13 +30,19 @@ Batch processing:
 __version__ = "0.1.0"
 
 # Core types
-from book_match.core.types import (
-    BatchProgress,
-    Book,
-    MatchFactor,
-    MatchResult,
-    MatchVerdict,
-    SearchQuery,
+# Batch processing
+from book_match.batch import (
+    DEFAULT_DEDUP_RULES,
+    DEFAULT_LINK_RULES,
+    BatchMatcher,
+    BlockingRule,
+    CompositeBlock,
+    FirstAuthorSurname,
+    ISBN13Prefix,
+    LanguageBlock,
+    TitleFirstWord,
+    TitlePrefix,
+    YearRange,
 )
 
 # Configuration
@@ -53,9 +59,14 @@ from book_match.core.exceptions import (
     SourceRateLimitError,
     SourceRequestError,
 )
-
-# Matching engine
-from book_match.matching.engine import BookMatcher
+from book_match.core.types import (
+    BatchProgress,
+    Book,
+    MatchFactor,
+    MatchResult,
+    MatchVerdict,
+    SearchQuery,
+)
 
 # ISBN utilities
 from book_match.isbn import (
@@ -70,6 +81,9 @@ from book_match.isbn import (
     normalize_to_isbn13,
     validate_isbn,
 )
+
+# Matching engine
+from book_match.matching.engine import BookMatcher
 
 # Normalizers
 from book_match.matching.normalizers import (
@@ -92,21 +106,6 @@ from book_match.matching.similarity import (
     token_set_ratio,
     token_sort_ratio,
     weighted_ratio,
-)
-
-# Batch processing
-from book_match.batch import (
-    BatchMatcher,
-    BlockingRule,
-    CompositeBlock,
-    DEFAULT_DEDUP_RULES,
-    DEFAULT_LINK_RULES,
-    FirstAuthorSurname,
-    ISBN13Prefix,
-    LanguageBlock,
-    TitleFirstWord,
-    TitlePrefix,
-    YearRange,
 )
 
 # Sources (lazy loaded to avoid httpx dependency when not needed)

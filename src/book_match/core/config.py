@@ -38,12 +38,9 @@ class MatchConfig:
     # Normalization options
     strip_subtitles: bool = True
     strip_series_markers: bool = True
-    normalize_author_order: bool = True
 
     # Year matching
-    year_exact_bonus: float = 0.02  # Bonus for exact year match
     year_proximity_range: int = 2  # Years within this range get partial credit
-    year_mismatch_penalty: float = 0.1  # Penalty when years differ significantly
 
     def __post_init__(self) -> None:
         """Validate configuration."""

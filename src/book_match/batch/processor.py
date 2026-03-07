@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict
-from typing import TYPE_CHECKING, Iterator, Sequence
+from collections.abc import Iterator, Sequence
+from typing import TYPE_CHECKING
 
-from book_match.batch.blocking import BlockingRule, DEFAULT_DEDUP_RULES, DEFAULT_LINK_RULES
+from book_match.batch.blocking import DEFAULT_DEDUP_RULES, DEFAULT_LINK_RULES, BlockingRule
 from book_match.core.config import BatchConfig
 from book_match.core.types import BatchProgress, Book, MatchResult
 from book_match.matching.engine import BookMatcher
@@ -113,7 +114,7 @@ class BatchMatcher:
         matches_found = 0
 
         # Compare within each block
-        for block_key, indices in blocks.items():
+        for _block_key, indices in blocks.items():
             for i, idx1 in enumerate(indices):
                 for idx2 in indices[i + 1:]:
                     # Ensure consistent ordering
@@ -192,7 +193,6 @@ class BatchMatcher:
 
         start_time = time.time()
         completed = 0
-        matches_found = 0
 
         # Track best match for each left book
         best_matches: dict[int, MatchResult] = {}

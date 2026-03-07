@@ -40,15 +40,13 @@ book_match/
 │
 ├── sources/                 # Metadata source abstraction
 │   ├── base.py              # MetadataSource protocol
-│   ├── registry.py          # Source registration and discovery
+│   ├── resolver.py          # BookResolver orchestration
 │   ├── google_books.py      # Google Books API
-│   ├── openlibrary.py       # OpenLibrary API
-│   └── hardcover.py         # Hardcover.app API (optional)
+│   └── openlibrary.py       # OpenLibrary API
 │
 └── batch/                   # Batch processing
     ├── processor.py         # BatchMatcher orchestration
-    ├── blocking.py          # Blocking strategies to reduce comparisons
-    └── results.py           # Streaming results, progress tracking
+    └── blocking.py          # Blocking strategies to reduce comparisons
 ```
 
 ## Core Types
@@ -305,8 +303,8 @@ for factor in result.factors:
 
 **Required:**
 - `rapidfuzz>=3.0`: Fast string matching
-- `httpx>=0.25`: Async HTTP client (for sources)
 
 **Optional:**
+- `httpx>=0.25`: Async HTTP client for metadata source integrations
 - `pandas>=2.0`: DataFrame integration for batch processing
 - `tqdm>=4.0`: Progress bars

@@ -40,6 +40,9 @@ def explain_title_factor(factor: MatchFactor) -> str:
 
     if factor.matched_values:
         local, remote = factor.matched_values
+        if not local or not remote:
+            available = local or remote
+            return f"Title {sim_desc} match ({pct}): \"{available}\""
         if local == remote:
             return f"Titles match exactly: \"{local}\""
         elif local.lower() == remote.lower():
@@ -64,6 +67,9 @@ def explain_author_factor(factor: MatchFactor) -> str:
 
     if factor.matched_values:
         local, remote = factor.matched_values
+        if not local or not remote:
+            available = local or remote
+            return f"Author {sim_desc} match ({pct}): \"{available}\""
         if local.lower() == remote.lower():
             return f"Authors match: {local}"
         else:

@@ -1,10 +1,10 @@
 """Batch processing for large-scale book matching."""
 
 from book_match.batch.blocking import (
-    BlockingRule,
-    CompositeBlock,
     DEFAULT_DEDUP_RULES,
     DEFAULT_LINK_RULES,
+    BlockingRule,
+    CompositeBlock,
     FirstAuthorSurname,
     ISBN13Prefix,
     LanguageBlock,

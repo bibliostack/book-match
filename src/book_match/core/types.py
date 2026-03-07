@@ -2,12 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 
 class MatchVerdict(Enum):
@@ -90,7 +86,7 @@ class MatchFactor:
     weight: float  # configured weight for this factor
     contribution: float  # similarity * weight (actual score contribution)
     details: str  # human-readable explanation
-    matched_values: tuple[str, str] | None = None  # (local, remote) for debugging
+    matched_values: tuple[str | None, str | None] | None = None  # (local, remote) for debugging
 
 
 @dataclass(frozen=True, slots=True)
