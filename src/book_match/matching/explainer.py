@@ -42,20 +42,20 @@ def explain_title_factor(factor: MatchFactor) -> str:
         local, remote = factor.matched_values
         if not local or not remote:
             available = local or remote
-            return f"Title {sim_desc} match ({pct}): \"{available}\""
+            return f'Title {sim_desc} match ({pct}): "{available}"'
         if local == remote:
-            return f"Titles match exactly: \"{local}\""
+            return f'Titles match exactly: "{local}"'
         elif local.lower() == remote.lower():
-            return f"Titles match (case-insensitive): \"{local}\" ↔ \"{remote}\""
+            return f'Titles match (case-insensitive): "{local}" ↔ "{remote}"'
         else:
             # Check if one contains the other (subtitle case)
             if local.lower() in remote.lower() or remote.lower() in local.lower():
                 return (
                     f"Title {sim_desc} match ({pct}) after subtitle handling: "
-                    f"\"{local}\" ↔ \"{remote}\""
+                    f'"{local}" ↔ "{remote}"'
                 )
             else:
-                return f"Title {sim_desc} match ({pct}): \"{local}\" ↔ \"{remote}\""
+                return f'Title {sim_desc} match ({pct}): "{local}" ↔ "{remote}"'
 
     return f"Title {sim_desc} match ({pct})"
 
@@ -69,14 +69,11 @@ def explain_author_factor(factor: MatchFactor) -> str:
         local, remote = factor.matched_values
         if not local or not remote:
             available = local or remote
-            return f"Author {sim_desc} match ({pct}): \"{available}\""
+            return f'Author {sim_desc} match ({pct}): "{available}"'
         if local.lower() == remote.lower():
             return f"Authors match: {local}"
         else:
-            return (
-                f"Author {sim_desc} match ({pct}): "
-                f"\"{local}\" ↔ \"{remote}\""
-            )
+            return f'Author {sim_desc} match ({pct}): "{local}" ↔ "{remote}"'
 
     return f"Author {sim_desc} match ({pct})"
 

@@ -46,10 +46,7 @@ class MatchConfig:
     def __post_init__(self) -> None:
         """Validate configuration."""
         weights_sum = (
-            self.title_weight
-            + self.author_weight
-            + self.year_weight
-            + self.language_weight
+            self.title_weight + self.author_weight + self.year_weight + self.language_weight
         )
         if not (0.95 <= weights_sum <= 1.05):
             warnings.warn(

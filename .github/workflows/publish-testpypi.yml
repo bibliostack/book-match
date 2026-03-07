@@ -1,16 +1,20 @@
 name: Publish to TestPyPI
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
 
 permissions:
+  contents: read
   id-token: write
 
 jobs:
   build:
     name: Build Package
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
       - uses: actions/checkout@v4
 

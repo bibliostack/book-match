@@ -44,10 +44,7 @@ def calculate_isbn13_checksum(digits: str) -> str:
     if len(digits) != 12 or not digits.isdigit():
         raise ValueError("ISBN-13 base must be exactly 12 digits")
 
-    total = sum(
-        int(d) * (1 if i % 2 == 0 else 3)
-        for i, d in enumerate(digits)
-    )
+    total = sum(int(d) * (1 if i % 2 == 0 else 3) for i, d in enumerate(digits))
     check = (10 - (total % 10)) % 10
     return str(check)
 
@@ -146,7 +143,4 @@ def validate_isbn(isbn: str) -> str:
             raise InvalidISBNError(isbn, "invalid ISBN-13 checksum")
         return cleaned
     else:
-        raise InvalidISBNError(
-            isbn,
-            f"wrong length ({len(cleaned)} chars, expected 10 or 13)"
-        )
+        raise InvalidISBNError(isbn, f"wrong length ({len(cleaned)} chars, expected 10 or 13)")

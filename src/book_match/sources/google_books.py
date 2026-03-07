@@ -58,8 +58,7 @@ class GoogleBooksSource(BaseSource):
         """
         if httpx is None:
             raise ImportError(
-                "httpx is required for GoogleBooksSource. "
-                "Install it with: pip install httpx"
+                "httpx is required for GoogleBooksSource. Install it with: pip install httpx"
             )
         self.api_key = api_key
         self.timeout = timeout
@@ -94,7 +93,9 @@ class GoogleBooksSource(BaseSource):
 
                 if response.status_code == 429:
                     try:
-                        retry_after = min(float(response.headers.get("Retry-After", 60)), _MAX_RETRY_AFTER)
+                        retry_after = min(
+                            float(response.headers.get("Retry-After", 60)), _MAX_RETRY_AFTER
+                        )
                     except (ValueError, TypeError):
                         retry_after = 60.0
                     raise SourceRateLimitError(self.name, retry_after)

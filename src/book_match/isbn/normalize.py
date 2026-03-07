@@ -97,20 +97,24 @@ def format_isbn(isbn: str, separator: str = "-") -> str | None:
 
     if len(cleaned) == 10:
         # Simple ISBN-10 format: X-XXX-XXXXX-X
-        return separator.join([
-            cleaned[0],
-            cleaned[1:4],
-            cleaned[4:9],
-            cleaned[9],
-        ])
+        return separator.join(
+            [
+                cleaned[0],
+                cleaned[1:4],
+                cleaned[4:9],
+                cleaned[9],
+            ]
+        )
     elif len(cleaned) == 13:
         # Simple ISBN-13 format: XXX-X-XXX-XXXXX-X
-        return separator.join([
-            cleaned[0:3],
-            cleaned[3],
-            cleaned[4:7],
-            cleaned[7:12],
-            cleaned[12],
-        ])
+        return separator.join(
+            [
+                cleaned[0:3],
+                cleaned[3],
+                cleaned[4:7],
+                cleaned[7:12],
+                cleaned[12],
+            ]
+        )
     else:
         return None

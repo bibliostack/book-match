@@ -55,8 +55,7 @@ class OpenLibrarySource(BaseSource):
         """
         if httpx is None:
             raise ImportError(
-                "httpx is required for OpenLibrarySource. "
-                "Install it with: pip install httpx"
+                "httpx is required for OpenLibrarySource. Install it with: pip install httpx"
             )
         self.timeout = timeout
         self.max_retries = max_retries
@@ -172,7 +171,9 @@ class OpenLibrarySource(BaseSource):
             isbn_13=isbn_13,
             language=language,
             year=year,
-            publisher=data.get("publisher", [None])[0] if isinstance(data.get("publisher"), list) else data.get("publisher"),
+            publisher=data.get("publisher", [None])[0]
+            if isinstance(data.get("publisher"), list)
+            else data.get("publisher"),
             source=self.name,
             source_id=source_id,
         )

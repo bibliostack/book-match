@@ -15,12 +15,14 @@ def __getattr__(name: str):
     if name == "GoogleBooksSource":
         if _google_books is None:
             from book_match.sources.google_books import GoogleBooksSource
+
             _google_books = GoogleBooksSource
         return _google_books
 
     if name == "OpenLibrarySource":
         if _openlibrary is None:
             from book_match.sources.openlibrary import OpenLibrarySource
+
             _openlibrary = OpenLibrarySource
         return _openlibrary
 

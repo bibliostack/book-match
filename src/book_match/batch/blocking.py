@@ -156,6 +156,7 @@ class ISBN13Prefix(BlockingRule):
             # Try to convert ISBN-10
             if book.isbn_10:
                 from book_match.isbn.convert import isbn10_to_isbn13
+
                 try:
                     isbn = isbn10_to_isbn13(book.isbn_10, validate=False)
                 except Exception:

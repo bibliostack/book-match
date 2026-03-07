@@ -5,6 +5,7 @@ on:
     types: [published]
 
 permissions:
+  contents: read
   id-token: write
 
 jobs:
@@ -52,10 +53,19 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies and run tests
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Install built wheel and test dependencies
         run: |
-          pip install -e ".[dev]"
-          pytest
+          pip install dist/*.whl
+          pip install pytest pytest-asyncio
+
+      - name: Run tests
+        run: pytest
 
   publish:
     name: Publish to PyPI

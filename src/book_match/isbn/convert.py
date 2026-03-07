@@ -102,7 +102,4 @@ def normalize_to_isbn13(isbn: str, validate: bool = True) -> str:
     elif len(cleaned) == 10:
         return isbn10_to_isbn13(isbn, validate=validate)
     else:
-        raise InvalidISBNError(
-            isbn,
-            f"wrong length ({len(cleaned)} chars, expected 10 or 13)"
-        )
+        raise InvalidISBNError(isbn, f"wrong length ({len(cleaned)} chars, expected 10 or 13)")

@@ -200,8 +200,10 @@ class BookMatcher:
                 weight=self.config.year_weight,
                 contribution=0.5 * self.config.year_weight,
                 details="Year information incomplete",
-                matched_values=(str(local_year) if local_year else None,
-                               str(remote_year) if remote_year else None),
+                matched_values=(
+                    str(local_year) if local_year else None,
+                    str(remote_year) if remote_year else None,
+                ),
             )
 
         diff = abs(local_year - remote_year)
@@ -379,9 +381,7 @@ class BookMatcher:
             confidence=confidence,
             verdict=verdict,
             factors=tuple(factors),
-            explanation=generate_explanation(
-                confidence, verdict, tuple(factors), local, remote
-            ),
+            explanation=generate_explanation(confidence, verdict, tuple(factors), local, remote),
             local_book=local,
             remote_book=remote,
         )
@@ -437,8 +437,10 @@ class BookMatcher:
         """
         # Quick ISBN check
         isbn_score, _ = isbn_match_score(
-            local.isbn_10, local.isbn_13,
-            remote.isbn_10, remote.isbn_13,
+            local.isbn_10,
+            local.isbn_13,
+            remote.isbn_10,
+            remote.isbn_13,
         )
 
         if isbn_score == 1.0:
@@ -461,9 +463,6 @@ class BookMatcher:
         else:
             author_sim = 0.0
 
-        score = (
-            title_sim * self.config.title_weight +
-            author_sim * self.config.author_weight
-        )
+        score = title_sim * self.config.title_weight + author_sim * self.config.author_weight
 
         return min(score, self.config.max_non_isbn_confidence)

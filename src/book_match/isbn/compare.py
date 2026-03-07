@@ -67,12 +67,8 @@ def isbn_match_score(
         - 0.0 if both have ISBNs but they differ
         - -1.0 if no ISBNs available for comparison
     """
-    local_isbns = [
-        normalize_isbn(i) for i in [local_isbn_10, local_isbn_13] if i
-    ]
-    remote_isbns = [
-        normalize_isbn(i) for i in [remote_isbn_10, remote_isbn_13] if i
-    ]
+    local_isbns = [normalize_isbn(i) for i in [local_isbn_10, local_isbn_13] if i]
+    remote_isbns = [normalize_isbn(i) for i in [remote_isbn_10, remote_isbn_13] if i]
 
     # Filter out None values
     local_isbns = [i for i in local_isbns if i]

@@ -121,9 +121,11 @@ def __getattr__(name: str):
     """Lazy loading for optional source classes."""
     if name == "GoogleBooksSource":
         from book_match.sources.google_books import GoogleBooksSource
+
         return GoogleBooksSource
     if name == "OpenLibrarySource":
         from book_match.sources.openlibrary import OpenLibrarySource
+
         return OpenLibrarySource
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
