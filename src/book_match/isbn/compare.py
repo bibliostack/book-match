@@ -43,7 +43,7 @@ def compare_isbns(
         isbn13_a = normalize_to_isbn13(norm_a, validate=False)
         isbn13_b = normalize_to_isbn13(norm_b, validate=False)
         return isbn13_a == isbn13_b
-    except Exception:
+    except (ValueError, TypeError):
         return None
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 
 
@@ -56,22 +56,12 @@ class Book:
             return f"{self.authors[0]} and {self.authors[1]}"
         return f"{self.authors[0]} et al."
 
-    def with_updates(self, **kwargs) -> Book:
-        """Create a new Book with updated fields."""
-        current = {
-            "title": self.title,
-            "authors": self.authors,
-            "isbn_10": self.isbn_10,
-            "isbn_13": self.isbn_13,
-            "language": self.language,
-            "year": self.year,
-            "publisher": self.publisher,
-            "description": self.description,
-            "source": self.source,
-            "source_id": self.source_id,
-        }
-        current.update(kwargs)
-        return Book(**current)
+    def with_updates(self, **kwargs: str | int | tuple[str, ...] | None) -> Book:
+        """Create a new Book with updated fields.
+
+        Uses dataclasses.replace for type-safe field updates.
+        """
+        return replace(self, **kwargs)
 
 
 @dataclass(frozen=True, slots=True)

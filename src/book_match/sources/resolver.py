@@ -150,23 +150,10 @@ class BookResolver:
             )
 
         elif self.strategy == ResolveStrategy.CONSENSUS:
-            # Only return if multiple sources agree
-            # Group by (title, author) similarity
-            # This is a simplified implementation
-            if len(self.sources) < 2:
-                pass  # Can't have consensus with one source
-            else:
-                # Count sources that have matches above threshold
-                sources_with_matches: set[str] = set()
-                for result in results:
-                    if result.confidence >= min_confidence:
-                        source = result.remote_book.source
-                        if source:
-                            sources_with_matches.add(source)
-
-                # Only return results if multiple sources agree
-                if len(sources_with_matches) < 2:
-                    return []
+            raise NotImplementedError(
+                "CONSENSUS strategy is not yet implemented. "
+                "Use BEST_MATCH, FIRST_CONFIDENT, or ALL_SOURCES instead."
+            )
 
         return results[:max_results]
 
