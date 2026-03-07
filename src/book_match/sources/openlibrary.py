@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 try:
     import httpx
 except ImportError:
-    httpx = None  # type: ignore
+    httpx = None  # type: ignore[assignment]
 
 # Valid OpenLibrary key patterns: /works/OL123W, /books/OL123M, etc.
 _SAFE_OL_ID_PATTERN = re.compile(r"^/?(?:works|books|editions|authors)/OL\d+[AMWC]$")
@@ -55,8 +55,7 @@ class OpenLibrarySource(BaseSource):
         """
         if httpx is None:
             raise ImportError(
-                "httpx is required for OpenLibrarySource. "
-                "Install it with: pip install httpx"
+                "httpx is required for OpenLibrarySource. Install it with: pip install httpx"
             )
         self.timeout = timeout
         self.max_retries = max_retries
@@ -76,7 +75,7 @@ class OpenLibrarySource(BaseSource):
             )
         return self._client
 
-    async def _request(self, url: str, params: dict | None = None) -> dict[str, Any]:
+    async def _request(self, url: str, params: dict[str, str] | None = None) -> dict[str, Any]:
         """Make an HTTP request with retries."""
         client = await self._get_client()
         last_error: Exception | None = None
@@ -85,7 +84,8 @@ class OpenLibrarySource(BaseSource):
             try:
                 response = await client.get(url, params=params)
                 response.raise_for_status()
-                return response.json()
+                result: dict[str, Any] = response.json()
+                return result
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 404:
                     return {}  # Not found
@@ -172,7 +172,9 @@ class OpenLibrarySource(BaseSource):
             isbn_13=isbn_13,
             language=language,
             year=year,
-            publisher=data.get("publisher", [None])[0] if isinstance(data.get("publisher"), list) else data.get("publisher"),
+            publisher=data.get("publisher", [None])[0]
+            if isinstance(data.get("publisher"), list)
+            else data.get("publisher"),
             source=self.name,
             source_id=source_id,
         )

@@ -35,9 +35,11 @@ class FakeSource(BaseSource):
 class TestResolve:
     @pytest.mark.asyncio
     async def test_resolve_finds_match(self):
-        source = FakeSource(books=[
-            Book(title="The Great Gatsby", authors=("Fitzgerald",), source="fake"),
-        ])
+        source = FakeSource(
+            books=[
+                Book(title="The Great Gatsby", authors=("Fitzgerald",), source="fake"),
+            ]
+        )
         resolver = BookResolver(sources=[source])
         book = Book(title="The Great Gatsby", authors=("Fitzgerald",))
         results = await resolver.resolve(book, min_confidence=0.5)
@@ -64,9 +66,11 @@ class TestResolve:
 class TestResolveByISBN:
     @pytest.mark.asyncio
     async def test_isbn_match(self):
-        source = FakeSource(books=[
-            Book(title="Test", isbn_13="9780743273565", source="fake"),
-        ])
+        source = FakeSource(
+            books=[
+                Book(title="Test", isbn_13="9780743273565", source="fake"),
+            ]
+        )
         resolver = BookResolver(sources=[source])
         results = await resolver.resolve_by_isbn("9780743273565")
         assert len(results) >= 1
@@ -82,9 +86,11 @@ class TestResolveByISBN:
 class TestStrategies:
     @pytest.mark.asyncio
     async def test_first_confident(self):
-        source = FakeSource(books=[
-            Book(title="The Great Gatsby", authors=("Fitzgerald",), source="fake"),
-        ])
+        source = FakeSource(
+            books=[
+                Book(title="The Great Gatsby", authors=("Fitzgerald",), source="fake"),
+            ]
+        )
         resolver = BookResolver(
             sources=[source],
             strategy=ResolveStrategy.FIRST_CONFIDENT,
@@ -95,12 +101,18 @@ class TestStrategies:
 
     @pytest.mark.asyncio
     async def test_consensus_raises(self):
-        source1 = FakeSource(name="s1", books=[
-            Book(title="Gatsby", authors=("Fitzgerald",), source="s1"),
-        ])
-        source2 = FakeSource(name="s2", books=[
-            Book(title="Gatsby", authors=("Fitzgerald",), source="s2"),
-        ])
+        source1 = FakeSource(
+            name="s1",
+            books=[
+                Book(title="Gatsby", authors=("Fitzgerald",), source="s1"),
+            ],
+        )
+        source2 = FakeSource(
+            name="s2",
+            books=[
+                Book(title="Gatsby", authors=("Fitzgerald",), source="s2"),
+            ],
+        )
         resolver = BookResolver(
             sources=[source1, source2],
             strategy=ResolveStrategy.CONSENSUS,

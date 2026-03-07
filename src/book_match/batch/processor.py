@@ -105,8 +105,7 @@ class BatchMatcher:
 
         # Count total comparisons needed
         total_comparisons = sum(
-            len(indices) * (len(indices) - 1) // 2
-            for indices in blocks.values()
+            len(indices) * (len(indices) - 1) // 2 for indices in blocks.values()
         )
 
         start_time = time.time()
@@ -116,7 +115,7 @@ class BatchMatcher:
         # Compare within each block
         for _block_key, indices in blocks.items():
             for i, idx1 in enumerate(indices):
-                for idx2 in indices[i + 1:]:
+                for idx2 in indices[i + 1 :]:
                     # Ensure consistent ordering
                     pair = (min(idx1, idx2), max(idx1, idx2))
                     if pair in compared:
@@ -139,22 +138,26 @@ class BatchMatcher:
                     # Progress callback
                     if on_progress and completed % 100 == 0:
                         elapsed = time.time() - start_time
-                        on_progress(BatchProgress(
-                            total=total_comparisons,
-                            completed=completed,
-                            matches_found=matches_found,
-                            elapsed_seconds=elapsed,
-                        ))
+                        on_progress(
+                            BatchProgress(
+                                total=total_comparisons,
+                                completed=completed,
+                                matches_found=matches_found,
+                                elapsed_seconds=elapsed,
+                            )
+                        )
 
         # Final progress
         if on_progress:
             elapsed = time.time() - start_time
-            on_progress(BatchProgress(
-                total=total_comparisons,
-                completed=completed,
-                matches_found=matches_found,
-                elapsed_seconds=elapsed,
-            ))
+            on_progress(
+                BatchProgress(
+                    total=total_comparisons,
+                    completed=completed,
+                    matches_found=matches_found,
+                    elapsed_seconds=elapsed,
+                )
+            )
 
     def link(
         self,
@@ -187,8 +190,7 @@ class BatchMatcher:
 
         # Count total comparisons
         total_comparisons = sum(
-            len(left_blocks[key]) * len(right_blocks[key])
-            for key in overlapping_keys
+            len(left_blocks[key]) * len(right_blocks[key]) for key in overlapping_keys
         )
 
         start_time = time.time()
@@ -224,12 +226,14 @@ class BatchMatcher:
                     # Progress callback
                     if on_progress and completed % 100 == 0:
                         elapsed = time.time() - start_time
-                        on_progress(BatchProgress(
-                            total=total_comparisons,
-                            completed=completed,
-                            matches_found=len(best_matches),
-                            elapsed_seconds=elapsed,
-                        ))
+                        on_progress(
+                            BatchProgress(
+                                total=total_comparisons,
+                                completed=completed,
+                                matches_found=len(best_matches),
+                                elapsed_seconds=elapsed,
+                            )
+                        )
 
         # Yield results sorted by confidence
         sorted_matches = sorted(
@@ -244,12 +248,14 @@ class BatchMatcher:
         # Final progress
         if on_progress:
             elapsed = time.time() - start_time
-            on_progress(BatchProgress(
-                total=total_comparisons,
-                completed=completed,
-                matches_found=len(best_matches),
-                elapsed_seconds=elapsed,
-            ))
+            on_progress(
+                BatchProgress(
+                    total=total_comparisons,
+                    completed=completed,
+                    matches_found=len(best_matches),
+                    elapsed_seconds=elapsed,
+                )
+            )
 
     def find_matches(
         self,

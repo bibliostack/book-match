@@ -27,8 +27,12 @@ class TestISBNMatch:
 
 class TestTitleAuthorMatch:
     def test_exact_match_high_confidence(self, matcher):
-        local = Book(title="The Great Gatsby", authors=("F. Scott Fitzgerald",), language="en", year=1925)
-        remote = Book(title="The Great Gatsby", authors=("F. Scott Fitzgerald",), language="en", year=1925)
+        local = Book(
+            title="The Great Gatsby", authors=("F. Scott Fitzgerald",), language="en", year=1925
+        )
+        remote = Book(
+            title="The Great Gatsby", authors=("F. Scott Fitzgerald",), language="en", year=1925
+        )
         result = matcher.match(local, remote)
         assert result.confidence >= 0.90
         assert result.verdict == MatchVerdict.AUTO_ACCEPT

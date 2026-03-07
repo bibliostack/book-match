@@ -61,7 +61,7 @@ class Book:
 
         Uses dataclasses.replace for type-safe field updates.
         """
-        return replace(self, **kwargs)
+        return replace(self, **kwargs)  # type: ignore[arg-type]
 
 
 @dataclass(frozen=True, slots=True)

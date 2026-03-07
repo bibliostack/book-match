@@ -130,7 +130,7 @@ class TitleFirstWord(BlockingRule):
         # Skip articles
         for word in words:
             if word not in self._ARTICLES:
-                return word
+                return str(word)
 
         # If all words are articles, use the first one
         return words[0] if words else None
@@ -156,6 +156,7 @@ class ISBN13Prefix(BlockingRule):
             # Try to convert ISBN-10
             if book.isbn_10:
                 from book_match.isbn.convert import isbn10_to_isbn13
+
                 try:
                     isbn = isbn10_to_isbn13(book.isbn_10, validate=False)
                 except Exception:

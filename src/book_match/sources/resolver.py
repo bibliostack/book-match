@@ -104,10 +104,7 @@ class BookResolver:
             return []
 
         # Query all sources concurrently
-        tasks = [
-            self._query_source(source, query, query_limit)
-            for source in self.sources
-        ]
+        tasks = [self._query_source(source, query, query_limit) for source in self.sources]
         source_results = await asyncio.gather(*tasks)
 
         # Collect all candidates

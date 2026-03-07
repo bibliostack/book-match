@@ -22,7 +22,7 @@ _MAX_RETRY_AFTER = 300  # 5 minutes max
 try:
     import httpx
 except ImportError:
-    httpx = None  # type: ignore
+    httpx = None  # type: ignore[assignment]
 
 # Only allow alphanumeric, hyphens, and underscores in source IDs
 _SAFE_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")
@@ -58,8 +58,7 @@ class GoogleBooksSource(BaseSource):
         """
         if httpx is None:
             raise ImportError(
-                "httpx is required for GoogleBooksSource. "
-                "Install it with: pip install httpx"
+                "httpx is required for GoogleBooksSource. Install it with: pip install httpx"
             )
         self.api_key = api_key
         self.timeout = timeout
@@ -94,13 +93,16 @@ class GoogleBooksSource(BaseSource):
 
                 if response.status_code == 429:
                     try:
-                        retry_after = min(float(response.headers.get("Retry-After", 60)), _MAX_RETRY_AFTER)
+                        retry_after = min(
+                            float(response.headers.get("Retry-After", 60)), _MAX_RETRY_AFTER
+                        )
                     except (ValueError, TypeError):
                         retry_after = 60.0
                     raise SourceRateLimitError(self.name, retry_after)
 
                 response.raise_for_status()
-                return response.json()
+                result: dict[str, Any] = response.json()
+                return result
 
             except SourceRateLimitError:
                 raise

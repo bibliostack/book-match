@@ -8,19 +8,21 @@ _google_books: type | None = None
 _openlibrary: type | None = None
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> type:
     """Lazy loading for source classes that require httpx."""
     global _google_books, _openlibrary
 
     if name == "GoogleBooksSource":
         if _google_books is None:
             from book_match.sources.google_books import GoogleBooksSource
+
             _google_books = GoogleBooksSource
         return _google_books
 
     if name == "OpenLibrarySource":
         if _openlibrary is None:
             from book_match.sources.openlibrary import OpenLibrarySource
+
             _openlibrary = OpenLibrarySource
         return _openlibrary
 
