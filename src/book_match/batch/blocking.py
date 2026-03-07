@@ -130,7 +130,7 @@ class TitleFirstWord(BlockingRule):
         # Skip articles
         for word in words:
             if word not in self._ARTICLES:
-                return word
+                return str(word)
 
         # If all words are articles, use the first one
         return words[0] if words else None

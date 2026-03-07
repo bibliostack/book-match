@@ -22,7 +22,7 @@ _MAX_RETRY_AFTER = 300  # 5 minutes max
 try:
     import httpx
 except ImportError:
-    httpx = None  # type: ignore
+    httpx = None
 
 # Only allow alphanumeric, hyphens, and underscores in source IDs
 _SAFE_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")
@@ -101,7 +101,8 @@ class GoogleBooksSource(BaseSource):
                     raise SourceRateLimitError(self.name, retry_after)
 
                 response.raise_for_status()
-                return response.json()
+                result: dict[str, Any] = response.json()
+                return result
 
             except SourceRateLimitError:
                 raise

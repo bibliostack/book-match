@@ -8,7 +8,7 @@ _google_books: type | None = None
 _openlibrary: type | None = None
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> type:
     """Lazy loading for source classes that require httpx."""
     global _google_books, _openlibrary
 

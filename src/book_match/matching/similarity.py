@@ -26,7 +26,7 @@ def jaro_winkler_similarity(s1: str, s2: str) -> float:
         return 1.0
     if not s1 or not s2:
         return 0.0
-    return JaroWinkler.similarity(s1, s2)
+    return float(JaroWinkler.similarity(s1, s2))
 
 
 def jaro_similarity(s1: str, s2: str) -> float:
@@ -46,7 +46,7 @@ def jaro_similarity(s1: str, s2: str) -> float:
     if not s1 or not s2:
         return 0.0
     # JaroWinkler with prefix_weight=0 is equivalent to Jaro
-    return JaroWinkler.similarity(s1, s2, prefix_weight=0)
+    return float(JaroWinkler.similarity(s1, s2, prefix_weight=0))
 
 
 def token_set_ratio(s1: str, s2: str) -> float:
@@ -70,7 +70,7 @@ def token_set_ratio(s1: str, s2: str) -> float:
         return 1.0
     if not s1 or not s2:
         return 0.0
-    return fuzz.token_set_ratio(s1, s2) / 100.0
+    return float(fuzz.token_set_ratio(s1, s2)) / 100.0
 
 
 def token_sort_ratio(s1: str, s2: str) -> float:
@@ -90,7 +90,7 @@ def token_sort_ratio(s1: str, s2: str) -> float:
         return 1.0
     if not s1 or not s2:
         return 0.0
-    return fuzz.token_sort_ratio(s1, s2) / 100.0
+    return float(fuzz.token_sort_ratio(s1, s2)) / 100.0
 
 
 def partial_ratio(s1: str, s2: str) -> float:
@@ -109,7 +109,7 @@ def partial_ratio(s1: str, s2: str) -> float:
         return 1.0
     if not s1 or not s2:
         return 0.0
-    return fuzz.partial_ratio(s1, s2) / 100.0
+    return float(fuzz.partial_ratio(s1, s2)) / 100.0
 
 
 def weighted_ratio(s1: str, s2: str) -> float:
@@ -129,7 +129,7 @@ def weighted_ratio(s1: str, s2: str) -> float:
         return 1.0
     if not s1 or not s2:
         return 0.0
-    return fuzz.WRatio(s1, s2) / 100.0
+    return float(fuzz.WRatio(s1, s2)) / 100.0
 
 
 def hybrid_similarity(s1: str, s2: str) -> float:
@@ -175,4 +175,4 @@ def quick_ratio(s1: str, s2: str) -> float:
         return 1.0
     if not s1 or not s2:
         return 0.0
-    return fuzz.QRatio(s1, s2) / 100.0
+    return float(fuzz.QRatio(s1, s2)) / 100.0
