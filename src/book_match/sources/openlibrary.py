@@ -72,7 +72,7 @@ class OpenLibrarySource(BaseSource):
             self._client = httpx.AsyncClient(
                 timeout=self.timeout,
                 headers={"User-Agent": "book-match/1.0"},
-                follow_redirects=False,
+                follow_redirects=True,
             )
         return self._client
 

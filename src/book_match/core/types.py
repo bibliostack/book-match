@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 
 
@@ -61,7 +61,6 @@ class Book:
 
         Uses dataclasses.replace for type-safe field updates.
         """
-        from dataclasses import replace
         return replace(self, **kwargs)
 
 

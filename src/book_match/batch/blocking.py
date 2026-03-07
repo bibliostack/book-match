@@ -10,6 +10,8 @@ import re
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from book_match.matching.normalizers import normalize_language
+
 if TYPE_CHECKING:
     from book_match.core.types import Book
 
@@ -209,7 +211,6 @@ class LanguageBlock(BlockingRule):
         if not book.language:
             return None
 
-        from book_match.matching.normalizers import normalize_language
         normalized = normalize_language(book.language)
         return normalized if normalized else None
 

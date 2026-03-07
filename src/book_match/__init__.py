@@ -96,8 +96,17 @@ from book_match.matching.normalizers import (
     strip_subtitle,
 )
 
-# Similarity (only the primary entry point)
-from book_match.matching.similarity import hybrid_similarity
+# Similarity functions
+from book_match.matching.similarity import (
+    hybrid_similarity,
+    jaro_similarity,
+    jaro_winkler_similarity,
+    partial_ratio,
+    quick_ratio,
+    token_set_ratio,
+    token_sort_ratio,
+    weighted_ratio,
+)
 
 # Sources (lazy loaded to avoid httpx dependency when not needed)
 from book_match.sources import (
@@ -163,7 +172,14 @@ __all__ = [
     "strip_subtitle",
     "strip_series_markers",
     # Similarity
+    "jaro_similarity",
+    "jaro_winkler_similarity",
+    "token_set_ratio",
+    "token_sort_ratio",
+    "partial_ratio",
+    "weighted_ratio",
     "hybrid_similarity",
+    "quick_ratio",
     # Batch processing
     "BatchMatcher",
     "BlockingRule",
