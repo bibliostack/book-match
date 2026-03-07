@@ -1,20 +1,45 @@
-"""Shared test fixtures for book-match."""
+"""Shared fixtures for book-match tests."""
 
 import pytest
 
-from book_match import ScoringConfig
+from book_match.core.config import MatchConfig
+from book_match.core.types import Book
+from book_match.matching.engine import BookMatcher
 
 
 @pytest.fixture
 def default_config():
-    """Return a default ScoringConfig."""
-    return ScoringConfig()
+    return MatchConfig()
 
 
 @pytest.fixture
 def strict_config():
-    """Return a strict ScoringConfig with higher thresholds."""
-    return ScoringConfig(
-        auto_apply_threshold=0.95,
-        needs_review_threshold=0.80,
+    return MatchConfig.strict()
+
+
+@pytest.fixture
+def matcher():
+    return BookMatcher()
+
+
+@pytest.fixture
+def gatsby_local():
+    return Book(
+        title="The Great Gatsby",
+        authors=("F. Scott Fitzgerald",),
+        isbn_13="9780743273565",
+        language="en",
+        year=1925,
+    )
+
+
+@pytest.fixture
+def gatsby_remote():
+    return Book(
+        title="The Great Gatsby",
+        authors=("Fitzgerald, F. Scott",),
+        isbn_13="9780743273565",
+        language="en",
+        year=1925,
+        source="test",
     )
