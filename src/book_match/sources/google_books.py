@@ -6,6 +6,7 @@ API docs: https://developers.google.com/books/docs/v1/using
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from typing import Any
 
@@ -14,10 +15,17 @@ from book_match.core.types import Book, SearchQuery
 from book_match.isbn.normalize import normalize_isbn
 from book_match.sources.base import BaseSource
 
+logger = logging.getLogger(__name__)
+
+_MAX_RETRY_AFTER = 300  # 5 minutes max
+
 try:
     import httpx
 except ImportError:
     httpx = None  # type: ignore
+
+# Only allow alphanumeric, hyphens, and underscores in source IDs
+_SAFE_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_-]+$")
 
 
 class GoogleBooksSource(BaseSource):
@@ -68,7 +76,7 @@ class GoogleBooksSource(BaseSource):
             self._client = httpx.AsyncClient(
                 timeout=self.timeout,
                 headers={"User-Agent": "book-match/1.0"},
-                follow_redirects=True,
+                follow_redirects=False,
             )
         return self._client
 
@@ -85,7 +93,10 @@ class GoogleBooksSource(BaseSource):
                 response = await client.get(self.BASE_URL, params=params)
 
                 if response.status_code == 429:
-                    retry_after = float(response.headers.get("Retry-After", 60))
+                    try:
+                        retry_after = min(float(response.headers.get("Retry-After", 60)), _MAX_RETRY_AFTER)
+                    except (ValueError, TypeError):
+                        retry_after = 60.0
                     raise SourceRateLimitError(self.name, retry_after)
 
                 response.raise_for_status()
@@ -106,7 +117,7 @@ class GoogleBooksSource(BaseSource):
 
         raise SourceRequestError(
             self.name,
-            f"Request failed after {self.max_retries} attempts: {last_error}",
+            f"Request failed after {self.max_retries} attempts: {type(last_error).__name__}",
         )
 
     def _parse_book(self, item: dict[str, Any]) -> Book | None:
@@ -225,7 +236,8 @@ class GoogleBooksSource(BaseSource):
                 book = self._parse_book(item)
                 if book:
                     books.append(book)
-            except Exception:
+            except (KeyError, TypeError, ValueError) as e:
+                logger.debug("Skipping malformed Google Books item: %s", e)
                 continue
 
         return books
@@ -264,6 +276,9 @@ class GoogleBooksSource(BaseSource):
         Returns:
             Book if found, None otherwise
         """
+        if not source_id or not _SAFE_ID_PATTERN.match(source_id):
+            return None
+
         client = await self._get_client()
 
         try:

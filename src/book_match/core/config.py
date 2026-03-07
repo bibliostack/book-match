@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from typing import Literal
 
@@ -51,7 +52,6 @@ class MatchConfig:
             + self.language_weight
         )
         if not (0.95 <= weights_sum <= 1.05):
-            import warnings
             warnings.warn(
                 f"Factor weights sum to {weights_sum:.2f}, expected ~1.0. "
                 "This may produce unexpected confidence scores.",

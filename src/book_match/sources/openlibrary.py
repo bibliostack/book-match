@@ -7,6 +7,8 @@ API docs: https://openlibrary.org/developers/api
 from __future__ import annotations
 
 import asyncio
+import logging
+import re
 from typing import Any
 
 from book_match.core.exceptions import SourceRequestError
@@ -14,10 +16,15 @@ from book_match.core.types import Book, SearchQuery
 from book_match.isbn.normalize import normalize_isbn
 from book_match.sources.base import BaseSource
 
+logger = logging.getLogger(__name__)
+
 try:
     import httpx
 except ImportError:
     httpx = None  # type: ignore
+
+# Valid OpenLibrary key patterns: /works/OL123W, /books/OL123M, etc.
+_SAFE_OL_ID_PATTERN = re.compile(r"^/?(?:works|books|editions|authors)/OL\d+[AMWC]$")
 
 
 class OpenLibrarySource(BaseSource):
@@ -65,7 +72,7 @@ class OpenLibrarySource(BaseSource):
             self._client = httpx.AsyncClient(
                 timeout=self.timeout,
                 headers={"User-Agent": "book-match/1.0"},
-                follow_redirects=True,
+                follow_redirects=False,
             )
         return self._client
 
@@ -92,7 +99,7 @@ class OpenLibrarySource(BaseSource):
 
         raise SourceRequestError(
             self.name,
-            f"Request failed after {self.max_retries} attempts: {last_error}",
+            f"Request failed after {self.max_retries} attempts: {type(last_error).__name__}",
         )
 
     def _parse_book(self, data: dict[str, Any], source_id: str | None = None) -> Book:
@@ -138,7 +145,6 @@ class OpenLibrarySource(BaseSource):
         elif "publish_date" in data:
             # Try to extract year from publish_date
             pub_date = str(data["publish_date"])
-            import re
             match = re.search(r"\b(19|20)\d{2}\b", pub_date)
             if match:
                 year = int(match.group())
@@ -226,8 +232,9 @@ class OpenLibrarySource(BaseSource):
                 book = self._parse_book(doc)
                 if book.title:  # Only include books with titles
                     books.append(book)
-            except Exception:
-                continue  # Skip malformed entries
+            except (KeyError, TypeError, ValueError) as e:
+                logger.debug("Skipping malformed OpenLibrary entry: %s", e)
+                continue
 
         return books
 
@@ -261,6 +268,9 @@ class OpenLibrarySource(BaseSource):
         Returns:
             Book if found, None otherwise
         """
+        if not source_id or not _SAFE_OL_ID_PATTERN.match(source_id):
+            return None
+
         if not source_id.startswith("/"):
             source_id = f"/{source_id}"
 

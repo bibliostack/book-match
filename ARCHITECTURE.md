@@ -241,7 +241,7 @@ class MatchConfig:
     
     # ISBN behavior
     isbn_match_confidence: float = 0.98
-    isbn_mismatch_penalty: float = 0.3  # If both have ISBNs and they differ
+    isbn_mismatch_penalty: float = 0.50  # If both have ISBNs and they differ
     
     # Similarity settings
     title_algorithm: Literal["jaro_winkler", "token_set", "hybrid"] = "hybrid"
@@ -250,7 +250,6 @@ class MatchConfig:
     # Normalization
     strip_subtitles: bool = True
     strip_series_markers: bool = True
-    normalize_author_order: bool = True
 
 
 @dataclass
@@ -260,7 +259,7 @@ class BatchConfig:
     max_workers: int = 4
     chunk_size: int = 1000
     progress_interval: float = 1.0  # seconds between progress updates
-    score_cutoff: float = 0.5       # don't return matches below this
+    min_confidence: float = 0.5     # don't return matches below this
 ```
 
 ## Explainability

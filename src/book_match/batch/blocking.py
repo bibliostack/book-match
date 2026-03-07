@@ -209,24 +209,9 @@ class LanguageBlock(BlockingRule):
         if not book.language:
             return None
 
-        # Normalize language code
-        lang = book.language.lower().strip()
-
-        # Map common variations
-        mappings = {
-            "eng": "en",
-            "english": "en",
-            "spa": "es",
-            "spanish": "es",
-            "fra": "fr",
-            "fre": "fr",
-            "french": "fr",
-            "deu": "de",
-            "ger": "de",
-            "german": "de",
-        }
-
-        return mappings.get(lang, lang[:2] if len(lang) >= 2 else lang)
+        from book_match.matching.normalizers import normalize_language
+        normalized = normalize_language(book.language)
+        return normalized if normalized else None
 
 
 class CompositeBlock(BlockingRule):
