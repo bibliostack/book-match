@@ -1,0 +1,452 @@
+[
+  {
+    "description": "Exact same edition - identical ISBNs",
+    "local": {"title": "The Great Gatsby", "authors": ["F. Scott Fitzgerald"], "isbn_13": "9780743273565", "year": 2004, "language": "en"},
+    "remote": {"title": "The Great Gatsby", "authors": ["F. Scott Fitzgerald"], "isbn_13": "9780743273565", "year": 2004, "language": "en"},
+    "expected_verdict": "auto_accept",
+    "expected_kind": "same_edition",
+    "min_confidence": 0.95,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Same work, different editions - different ISBNs",
+    "local": {"title": "1984", "authors": ["George Orwell"], "isbn_13": "9780451524935", "year": 1961, "language": "en"},
+    "remote": {"title": "1984", "authors": ["George Orwell"], "isbn_13": "9780141036144", "year": 2008, "language": "en"},
+    "expected_verdict": null,
+    "expected_kind": "same_work",
+    "min_confidence": 0.3,
+    "max_confidence": 0.9
+  },
+  {
+    "description": "Same work - subtitle variation",
+    "local": {"title": "The Hitchhiker's Guide to the Galaxy", "authors": ["Douglas Adams"], "language": "en", "year": 1979},
+    "remote": {"title": "The Hitchhiker's Guide to the Galaxy: A Novel", "authors": ["Douglas Adams"], "language": "en", "year": 1979},
+    "expected_verdict": "auto_accept",
+    "expected_kind": null,
+    "min_confidence": 0.90,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Same work - author name format variation (Last, First vs First Last)",
+    "local": {"title": "To Kill a Mockingbird", "authors": ["Harper Lee"], "language": "en"},
+    "remote": {"title": "To Kill a Mockingbird", "authors": ["Lee, Harper"], "language": "en"},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.80,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Same work - author with initials vs full name",
+    "local": {"title": "A Brief History of Time", "authors": ["S. W. Hawking"], "language": "en"},
+    "remote": {"title": "A Brief History of Time", "authors": ["Stephen W. Hawking"], "language": "en"},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.70,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Completely different books",
+    "local": {"title": "The Great Gatsby", "authors": ["F. Scott Fitzgerald"], "language": "en"},
+    "remote": {"title": "War and Peace", "authors": ["Leo Tolstoy"], "language": "en"},
+    "expected_verdict": "reject",
+    "expected_kind": "uncertain",
+    "min_confidence": 0.0,
+    "max_confidence": 0.50
+  },
+  {
+    "description": "Similar title, different author - not the same book",
+    "local": {"title": "The Road", "authors": ["Cormac McCarthy"], "year": 2006, "language": "en"},
+    "remote": {"title": "The Road", "authors": ["Jack London"], "year": 1913, "language": "en"},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.0,
+    "max_confidence": 0.75
+  },
+  {
+    "description": "ISBN-10 vs ISBN-13 of same book",
+    "local": {"title": "Dune", "authors": ["Frank Herbert"], "isbn_10": "0441172717"},
+    "remote": {"title": "Dune", "authors": ["Frank Herbert"], "isbn_13": "9780441172719"},
+    "expected_verdict": "auto_accept",
+    "expected_kind": "same_edition",
+    "min_confidence": 0.95,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Non-English book - exact match",
+    "local": {"title": "Cien años de soledad", "authors": ["Gabriel García Márquez"], "language": "es", "year": 1967},
+    "remote": {"title": "Cien años de soledad", "authors": ["Gabriel Garcia Marquez"], "language": "es", "year": 1967},
+    "expected_verdict": "auto_accept",
+    "expected_kind": null,
+    "min_confidence": 0.88,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Language mismatch - translation",
+    "local": {"title": "One Hundred Years of Solitude", "authors": ["Gabriel Garcia Marquez"], "language": "en", "year": 1970},
+    "remote": {"title": "Cien años de soledad", "authors": ["Gabriel Garcia Marquez"], "language": "es", "year": 1967},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.0,
+    "max_confidence": 0.80
+  },
+  {
+    "description": "Series book - same volume",
+    "local": {"title": "Harry Potter and the Philosopher's Stone (Book 1)", "authors": ["J.K. Rowling"], "language": "en"},
+    "remote": {"title": "Harry Potter and the Philosopher's Stone (Book 1)", "authors": ["J. K. Rowling"], "language": "en"},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.80,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Series book - different volumes should not match strongly",
+    "local": {"title": "Harry Potter (Book 1)", "authors": ["J.K. Rowling"]},
+    "remote": {"title": "Harry Potter (Book 2)", "authors": ["J.K. Rowling"]},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.0,
+    "max_confidence": 0.85
+  },
+  {
+    "description": "Multiple authors - same set",
+    "local": {"title": "Good Omens", "authors": ["Terry Pratchett", "Neil Gaiman"], "language": "en"},
+    "remote": {"title": "Good Omens", "authors": ["Neil Gaiman", "Terry Pratchett"], "language": "en"},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.85,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Multiple authors - partial overlap",
+    "local": {"title": "Textbook", "authors": ["Author A", "Author B", "Author C"]},
+    "remote": {"title": "Textbook", "authors": ["Author A", "Author B"]},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.60,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Minimal metadata - title only",
+    "local": {"title": "Sapiens"},
+    "remote": {"title": "Sapiens"},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.30,
+    "max_confidence": 0.97
+  },
+  {
+    "description": "Year close but not exact",
+    "local": {"title": "Clean Code", "authors": ["Robert C. Martin"], "year": 2008, "language": "en"},
+    "remote": {"title": "Clean Code", "authors": ["Robert C. Martin"], "year": 2009, "language": "en"},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.85,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Year very different",
+    "local": {"title": "The Art of War", "authors": ["Sun Tzu"], "year": -500},
+    "remote": {"title": "The Art of War", "authors": ["Sun Tzu"], "year": 2010},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.50,
+    "max_confidence": 0.97
+  },
+  {
+    "description": "Empty vs populated metadata",
+    "local": {"title": "Unknown Book"},
+    "remote": {"title": "The Great Gatsby", "authors": ["Fitzgerald"], "year": 1925, "language": "en"},
+    "expected_verdict": "reject",
+    "expected_kind": null,
+    "min_confidence": 0.0,
+    "max_confidence": 0.50
+  },
+  {
+    "description": "Same title and author, different publisher (different edition)",
+    "local": {"title": "Pride and Prejudice", "authors": ["Jane Austen"], "year": 2003, "language": "en", "publisher": "Penguin Classics"},
+    "remote": {"title": "Pride and Prejudice", "authors": ["Jane Austen"], "year": 2003, "language": "en", "publisher": "Oxford World's Classics"},
+    "expected_verdict": "auto_accept",
+    "expected_kind": null,
+    "min_confidence": 0.88,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Case-insensitive title matching",
+    "local": {"title": "THE CATCHER IN THE RYE", "authors": ["J.D. Salinger"]},
+    "remote": {"title": "The Catcher in the Rye", "authors": ["J.D. Salinger"]},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.80,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Unicode normalization - accented characters",
+    "local": {"title": "Les Misérables", "authors": ["Victor Hugo"], "language": "fr"},
+    "remote": {"title": "Les Miserables", "authors": ["Victor Hugo"], "language": "fr"},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.85,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Title with em-dash subtitle separator",
+    "local": {"title": "Sapiens", "authors": ["Yuval Noah Harari"]},
+    "remote": {"title": "Sapiens — A Brief History of Humankind", "authors": ["Yuval Noah Harari"]},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.80,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Very short title - single word match",
+    "local": {"title": "Dune", "authors": ["Frank Herbert"]},
+    "remote": {"title": "Dune", "authors": ["Frank Herbert"]},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.80,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Author with suffix - PhD",
+    "local": {"title": "Thinking, Fast and Slow", "authors": ["Daniel Kahneman, PhD"]},
+    "remote": {"title": "Thinking, Fast and Slow", "authors": ["Daniel Kahneman"]},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.80,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Same ISBN, slightly different metadata",
+    "local": {"title": "The Hobbit", "authors": ["J.R.R. Tolkien"], "isbn_13": "9780547928227", "year": 2012},
+    "remote": {"title": "The Hobbit, or There and Back Again", "authors": ["J. R. R. Tolkien"], "isbn_13": "9780547928227", "year": 2012},
+    "expected_verdict": "auto_accept",
+    "expected_kind": "same_edition",
+    "min_confidence": 0.95,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "No metadata at all",
+    "local": {},
+    "remote": {},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.0,
+    "max_confidence": 0.50
+  },
+  {
+    "description": "Only ISBN, matching",
+    "local": {"isbn_13": "9780743273565"},
+    "remote": {"isbn_13": "9780743273565"},
+    "expected_verdict": "auto_accept",
+    "expected_kind": "same_edition",
+    "min_confidence": 0.95,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Only ISBN, different",
+    "local": {"isbn_13": "9780743273565"},
+    "remote": {"isbn_13": "9780141036144"},
+    "expected_verdict": "reject",
+    "expected_kind": null,
+    "min_confidence": 0.0,
+    "max_confidence": 0.30
+  },
+  {
+    "description": "Author with Jr. suffix",
+    "local": {"title": "Jurassic Park", "authors": ["Michael Crichton Jr."]},
+    "remote": {"title": "Jurassic Park", "authors": ["Michael Crichton"]},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.80,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Title with series markers - bracket format",
+    "local": {"title": "The Name of the Wind [Kingkiller Chronicle #1]", "authors": ["Patrick Rothfuss"]},
+    "remote": {"title": "The Name of the Wind", "authors": ["Patrick Rothfuss"]},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.80,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Same title, very different years (reprint)",
+    "local": {"title": "Frankenstein", "authors": ["Mary Shelley"], "year": 1818, "language": "en"},
+    "remote": {"title": "Frankenstein", "authors": ["Mary Shelley"], "year": 2018, "language": "en"},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.60,
+    "max_confidence": 0.97
+  },
+  {
+    "description": "Title with colon subtitle, one source has it",
+    "local": {"title": "Educated: A Memoir", "authors": ["Tara Westover"]},
+    "remote": {"title": "Educated", "authors": ["Tara Westover"]},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.80,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Three-letter ISO language code vs two-letter",
+    "local": {"title": "Don Quixote", "authors": ["Miguel de Cervantes"], "language": "spa", "year": 1605},
+    "remote": {"title": "Don Quixote", "authors": ["Miguel de Cervantes"], "language": "es", "year": 1605},
+    "expected_verdict": "auto_accept",
+    "expected_kind": null,
+    "min_confidence": 0.88,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Same book, one source has extra authors",
+    "local": {"title": "Introduction to Algorithms", "authors": ["Thomas H. Cormen", "Charles E. Leiserson", "Ronald L. Rivest", "Clifford Stein"]},
+    "remote": {"title": "Introduction to Algorithms", "authors": ["Thomas H. Cormen"]},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.50,
+    "max_confidence": 0.97
+  },
+  {
+    "description": "German book with special characters",
+    "local": {"title": "Die Verwandlung", "authors": ["Franz Kafka"], "language": "de"},
+    "remote": {"title": "Die Verwandlung", "authors": ["Franz Kafka"], "language": "deu"},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.85,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Book with hyphenated subtitle separator",
+    "local": {"title": "Atomic Habits", "authors": ["James Clear"]},
+    "remote": {"title": "Atomic Habits -- An Easy & Proven Way to Build Good Habits", "authors": ["James Clear"]},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.80,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Exact match with all fields",
+    "local": {"title": "Project Hail Mary", "authors": ["Andy Weir"], "isbn_13": "9780593135204", "year": 2021, "language": "en", "publisher": "Ballantine Books"},
+    "remote": {"title": "Project Hail Mary", "authors": ["Andy Weir"], "isbn_13": "9780593135204", "year": 2021, "language": "en", "publisher": "Ballantine Books"},
+    "expected_verdict": "auto_accept",
+    "expected_kind": "same_edition",
+    "min_confidence": 0.95,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Same author different books",
+    "local": {"title": "The Martian", "authors": ["Andy Weir"], "year": 2014},
+    "remote": {"title": "Project Hail Mary", "authors": ["Andy Weir"], "year": 2021},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.0,
+    "max_confidence": 0.80
+  },
+  {
+    "description": "Title with pipe subtitle separator",
+    "local": {"title": "The Power of Habit", "authors": ["Charles Duhigg"]},
+    "remote": {"title": "The Power of Habit | Why We Do What We Do", "authors": ["Charles Duhigg"]},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.80,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "ISBN-10 hyphenated format",
+    "local": {"title": "Test", "isbn_10": "0-306-40615-2"},
+    "remote": {"title": "Test", "isbn_13": "9780306406157"},
+    "expected_verdict": "auto_accept",
+    "expected_kind": "same_edition",
+    "min_confidence": 0.95,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Very long title with minor differences",
+    "local": {"title": "The Curious Incident of the Dog in the Night-Time", "authors": ["Mark Haddon"]},
+    "remote": {"title": "The Curious Incident of the Dog in the Nighttime", "authors": ["Mark Haddon"]},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.80,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Single author vs multi-author edition",
+    "local": {"title": "The Complete Works of Shakespeare", "authors": ["William Shakespeare"]},
+    "remote": {"title": "The Complete Works of Shakespeare", "authors": ["William Shakespeare", "Stephen Orgel", "A. R. Braunmuller"]},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.50,
+    "max_confidence": 0.97
+  },
+  {
+    "description": "Same ISBN but one source missing title",
+    "local": {"isbn_13": "9780743273565"},
+    "remote": {"title": "The Great Gatsby", "isbn_13": "9780743273565", "authors": ["F. Scott Fitzgerald"]},
+    "expected_verdict": "auto_accept",
+    "expected_kind": "same_edition",
+    "min_confidence": 0.95,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Japanese book - different romanization",
+    "local": {"title": "Norwegian Wood", "authors": ["Haruki Murakami"], "language": "ja"},
+    "remote": {"title": "Norwegian Wood", "authors": ["Murakami, Haruki"], "language": "jpn"},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.80,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Classic with many editions - year only difference",
+    "local": {"title": "Moby Dick", "authors": ["Herman Melville"], "year": 1851, "language": "en"},
+    "remote": {"title": "Moby Dick", "authors": ["Herman Melville"], "year": 2000, "language": "en"},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.60,
+    "max_confidence": 0.97
+  },
+  {
+    "description": "Title with 'The' article difference",
+    "local": {"title": "Catcher in the Rye", "authors": ["J.D. Salinger"]},
+    "remote": {"title": "The Catcher in the Rye", "authors": ["J.D. Salinger"]},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.80,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Publisher name variation - with and without suffix",
+    "local": {"title": "Test Book", "authors": ["Author"], "publisher": "Penguin Random House LLC"},
+    "remote": {"title": "Test Book", "authors": ["Author"], "publisher": "Penguin Random House"},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.80,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Same title completely different context",
+    "local": {"title": "Cosmos", "authors": ["Carl Sagan"], "year": 1980},
+    "remote": {"title": "Cosmos", "authors": ["Witold Gombrowicz"], "year": 1965},
+    "expected_verdict": "reject",
+    "expected_kind": null,
+    "min_confidence": 0.0,
+    "max_confidence": 0.70
+  },
+  {
+    "description": "Anthology with editor vs author attribution",
+    "local": {"title": "The Best American Short Stories 2020", "authors": ["Curtis Sittenfeld"]},
+    "remote": {"title": "The Best American Short Stories 2020", "authors": ["Curtis Sittenfeld", "Heidi Pitlor"]},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.70,
+    "max_confidence": 1.0
+  },
+  {
+    "description": "Same work - en-dash vs hyphen in title",
+    "local": {"title": "Spider-Man: Into the Spider-Verse", "authors": ["Author"]},
+    "remote": {"title": "Spider–Man: Into the Spider–Verse", "authors": ["Author"]},
+    "expected_verdict": null,
+    "expected_kind": null,
+    "min_confidence": 0.70,
+    "max_confidence": 1.0
+  }
+]

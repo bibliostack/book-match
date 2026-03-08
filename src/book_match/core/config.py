@@ -40,13 +40,20 @@ class MatchConfig:
     strip_subtitles: bool = True
     strip_series_markers: bool = True
 
+    # Publisher matching (opt-in, default 0.0 so it does not affect existing scoring)
+    publisher_weight: float = 0.0
+
     # Year matching
     year_proximity_range: int = 2  # Years within this range get partial credit
 
     def __post_init__(self) -> None:
         """Validate configuration."""
         weights_sum = (
-            self.title_weight + self.author_weight + self.year_weight + self.language_weight
+            self.title_weight
+            + self.author_weight
+            + self.year_weight
+            + self.language_weight
+            + self.publisher_weight
         )
         if not (0.95 <= weights_sum <= 1.05):
             warnings.warn(

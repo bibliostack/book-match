@@ -135,6 +135,22 @@ def explain_language_factor(factor: MatchFactor) -> str:
         return "Languages do not match"
 
 
+def explain_publisher_factor(factor: MatchFactor) -> str:
+    """Generate explanation for publisher comparison."""
+    sim_desc = _describe_similarity(factor.similarity)
+    pct = f"{factor.similarity:.0%}"
+
+    if factor.matched_values:
+        local, remote = factor.matched_values
+        if not local or not remote:
+            return "Publisher information incomplete"
+        if local.lower() == remote.lower():
+            return f"Publishers match: {local}"
+        return f'Publisher {sim_desc} match ({pct}): "{local}" ↔ "{remote}"'
+
+    return f"Publisher {sim_desc} match ({pct})"
+
+
 def explain_factor(factor: MatchFactor) -> str:
     """Generate human-readable explanation for a match factor."""
     explainers = {
@@ -143,6 +159,7 @@ def explain_factor(factor: MatchFactor) -> str:
         "isbn": explain_isbn_factor,
         "year": explain_year_factor,
         "language": explain_language_factor,
+        "publisher": explain_publisher_factor,
     }
 
     explainer = explainers.get(factor.name)

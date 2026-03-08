@@ -1,6 +1,7 @@
 """Tests for text normalization utilities."""
 
 from book_match.matching.normalizers import (
+    extract_series_info,
     normalize_author,
     normalize_authors,
     normalize_language,
@@ -135,3 +136,36 @@ class TestNormalizeLanguage:
 
     def test_empty_returns_empty(self):
         assert normalize_language("") == ""
+
+
+class TestExtractSeriesInfo:
+    def test_book_number_parens(self):
+        title, vol = extract_series_info("Harry Potter (Book 1)")
+        assert vol == 1
+        assert "Harry Potter" in title
+
+    def test_volume_number(self):
+        title, vol = extract_series_info("Encyclopedia Volume 3")
+        assert vol == 3
+
+    def test_vol_dot_number(self):
+        title, vol = extract_series_info("Encyclopedia Vol. 2")
+        assert vol == 2
+
+    def test_hash_number(self):
+        title, vol = extract_series_info("Series Title #5")
+        assert vol == 5
+
+    def test_bracket_format(self):
+        title, vol = extract_series_info("Title [Book 4]")
+        assert vol == 4
+
+    def test_no_series_info(self):
+        title, vol = extract_series_info("The Great Gatsby")
+        assert title is None
+        assert vol is None
+
+    def test_none_input(self):
+        title, vol = extract_series_info(None)
+        assert title is None
+        assert vol is None

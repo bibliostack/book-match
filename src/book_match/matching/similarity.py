@@ -136,7 +136,12 @@ def hybrid_similarity(s1: str, s2: str) -> float:
     """Calculate hybrid similarity for book titles.
 
     Combines Jaro-Winkler (good for prefix matching) with token_set_ratio
-    (good for word reordering) and takes the best result.
+    (good for word reordering) and returns ``max(jw, tsr * 0.98)``.
+
+    The 0.98 discount on token_set_ratio means it must exceed Jaro-Winkler
+    by more than ~2% to be preferred. This biases toward character-level
+    similarity when scores are close, which better captures typos and
+    minor spelling variations that token-based methods can miss.
 
     Args:
         s1: First string

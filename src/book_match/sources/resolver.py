@@ -4,11 +4,20 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Sequence
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-from book_match.core.types import Book, MatchResult, SearchQuery
+from book_match.core.exceptions import SourceRateLimitError
+from book_match.core.types import (
+    Book,
+    MatchResult,
+    ResolveOutcome,
+    SearchQuery,
+    SourceDiagnostic,
+    SourceStatus,
+)
 from book_match.isbn.normalize import normalize_isbn
 from book_match.matching.engine import BookMatcher
 
@@ -51,6 +60,7 @@ class BookResolver:
         matcher: BookMatcher | None = None,
         match_config: MatchConfig | None = None,
         strategy: ResolveStrategy = ResolveStrategy.BEST_MATCH,
+        min_agreeing_sources: int = 2,
     ):
         """Initialize the resolver.
 
@@ -59,6 +69,7 @@ class BookResolver:
             matcher: BookMatcher instance (created with match_config if not provided)
             match_config: Configuration for matching (ignored if matcher provided)
             strategy: Resolution strategy
+            min_agreeing_sources: Minimum sources that must agree for CONSENSUS strategy
         """
         if not sources:
             raise ValueError("At least one metadata source is required")
@@ -66,6 +77,20 @@ class BookResolver:
         self.sources = list(sources)
         self.matcher = matcher or BookMatcher(match_config)
         self.strategy = strategy
+        self.min_agreeing_sources = min_agreeing_sources
+
+        if self.strategy == ResolveStrategy.CONSENSUS:
+            num_sources = len(self.sources)
+            if min_agreeing_sources < 2:
+                raise ValueError(
+                    "min_agreeing_sources must be at least 2 when using the "
+                    "CONSENSUS resolve strategy"
+                )
+            if min_agreeing_sources > num_sources:
+                raise ValueError(
+                    "min_agreeing_sources cannot exceed the number of configured "
+                    f"sources (got {min_agreeing_sources}, have {num_sources})"
+                )
 
     async def _query_source(
         self,
@@ -147,12 +172,174 @@ class BookResolver:
             )
 
         elif self.strategy == ResolveStrategy.CONSENSUS:
-            raise NotImplementedError(
-                "CONSENSUS strategy is not yet implemented. "
-                "Use BEST_MATCH, FIRST_CONFIDENT, or ALL_SOURCES instead."
-            )
+            results = self._apply_consensus(results, all_candidates)
 
         return results[:max_results]
+
+    def _apply_consensus(
+        self,
+        results: list[MatchResult],
+        all_candidates: list[Book],
+    ) -> list[MatchResult]:
+        """Filter results to only those confirmed by multiple sources.
+
+        Groups candidates by identity (using BookMatcher cross-comparison),
+        then keeps only groups that have candidates from at least
+        ``min_agreeing_sources`` distinct sources. Falls back to BEST_MATCH
+        behavior if fewer than 2 sources returned results.
+        """
+        # Determine how many distinct sources returned results
+        sources_with_results = {c.source for c in all_candidates if c.source}
+        if len(sources_with_results) < 2:
+            # Not enough sources to apply consensus — fall back to BEST_MATCH
+            return results
+
+        # Group candidates by identity using full match() to avoid
+        # quick_score's ISBN short-circuit missing title/author matches.
+        groups: list[list[Book]] = []
+        for candidate in all_candidates:
+            placed = False
+            for group in groups:
+                result = self.matcher.match(group[0], candidate)
+                if result.confidence >= 0.80:
+                    group.append(candidate)
+                    placed = True
+                    break
+            if not placed:
+                groups.append([candidate])
+
+        # Find candidates that appear in enough distinct sources.
+        # Book is a frozen dataclass (hashable), so use set[Book] directly.
+        consensus_candidates: set[Book] = set()
+        for group in groups:
+            distinct_sources = {b.source for b in group if b.source}
+            if len(distinct_sources) >= self.min_agreeing_sources:
+                for b in group:
+                    consensus_candidates.add(b)
+
+        # Filter results to only consensus candidates
+        filtered = [r for r in results if r.remote_book in consensus_candidates]
+        return filtered
+
+    async def _query_source_with_diagnostic(
+        self,
+        source: MetadataSource,
+        query: SearchQuery,
+        limit: int,
+    ) -> tuple[list[Book], SourceDiagnostic]:
+        """Query a single source and return results with diagnostic info."""
+        start = time.monotonic()
+        try:
+            results = await source.search(query, limit=limit)
+            elapsed = (time.monotonic() - start) * 1000
+            return results, SourceDiagnostic(
+                source_name=source.name,
+                status=SourceStatus.SUCCESS,
+                result_count=len(results),
+                duration_ms=elapsed,
+            )
+        except TimeoutError as e:
+            elapsed = (time.monotonic() - start) * 1000
+            return [], SourceDiagnostic(
+                source_name=source.name,
+                status=SourceStatus.TIMEOUT,
+                result_count=0,
+                duration_ms=elapsed,
+                error_message=str(e),
+            )
+        except SourceRateLimitError as e:
+            elapsed = (time.monotonic() - start) * 1000
+            return [], SourceDiagnostic(
+                source_name=source.name,
+                status=SourceStatus.RATE_LIMITED,
+                result_count=0,
+                duration_ms=elapsed,
+                error_message=str(e),
+            )
+        except Exception as e:
+            elapsed = (time.monotonic() - start) * 1000
+            return [], SourceDiagnostic(
+                source_name=source.name,
+                status=SourceStatus.ERROR,
+                result_count=0,
+                duration_ms=elapsed,
+                error_message=str(e),
+            )
+
+    async def resolve_with_diagnostics(
+        self,
+        book: Book,
+        min_confidence: float = 0.5,
+        max_results: int = 10,
+        query_limit: int = 10,
+    ) -> ResolveOutcome:
+        """Resolve a book against all sources, returning per-source diagnostics.
+
+        Same logic as resolve() but wraps results in a ResolveOutcome that
+        includes diagnostic information for each source query.
+
+        Args:
+            book: Book to find matches for
+            min_confidence: Minimum confidence to include
+            max_results: Maximum total results to return
+            query_limit: Maximum results per source query
+
+        Returns:
+            ResolveOutcome with results and source diagnostics
+        """
+        query = SearchQuery.from_book(book)
+
+        if query.is_empty:
+            return ResolveOutcome(results=(), source_diagnostics=())
+
+        tasks = [
+            self._query_source_with_diagnostic(source, query, query_limit)
+            for source in self.sources
+        ]
+        outcomes = await asyncio.gather(*tasks)
+
+        all_candidates: list[Book] = []
+        diagnostics: list[SourceDiagnostic] = []
+        for candidates, diagnostic in outcomes:
+            all_candidates.extend(candidates)
+            diagnostics.append(diagnostic)
+
+        if not all_candidates:
+            return ResolveOutcome(results=(), source_diagnostics=tuple(diagnostics))
+
+        results = self.matcher.match_many(book, all_candidates, min_confidence=min_confidence)
+
+        # Apply the configured strategy (same logic as resolve())
+        if self.strategy == ResolveStrategy.FIRST_CONFIDENT:
+            for result in results:
+                if result.should_auto_accept:
+                    return ResolveOutcome(
+                        results=(result,),
+                        source_diagnostics=tuple(diagnostics),
+                    )
+
+        elif self.strategy == ResolveStrategy.ALL_SOURCES:
+            best_by_source: dict[str, MatchResult] = {}
+            for result in results:
+                source = result.remote_book.source
+                if source:
+                    if source not in best_by_source:
+                        best_by_source[source] = result
+                    elif result.confidence > best_by_source[source].confidence:
+                        best_by_source[source] = result
+            results = sorted(
+                best_by_source.values(),
+                key=lambda r: r.confidence,
+                reverse=True,
+            )
+
+        elif self.strategy == ResolveStrategy.CONSENSUS:
+            results = self._apply_consensus(results, all_candidates)
+
+        return ResolveOutcome(
+            results=tuple(results[:max_results]),
+            source_diagnostics=tuple(diagnostics),
+        )
 
     async def resolve_by_isbn(
         self,
@@ -178,7 +365,7 @@ class BookResolver:
         )
 
         # Query sources for ISBN
-        tasks = [source.fetch_by_isbn(isbn) for source in self.sources]
+        tasks = [source.fetch_by_isbn(clean_isbn) for source in self.sources]
         source_results = await asyncio.gather(*tasks, return_exceptions=True)
 
         candidates = []
