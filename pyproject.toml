@@ -122,3 +122,19 @@ disallow_untyped_defs = true
 [[tool.mypy.overrides]]
 module = ["rapidfuzz.*", "httpx.*"]
 ignore_missing_imports = true
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+branch = "main"
+commit_message = "chore(release): v{version}"
+build_command = ""
+
+[tool.semantic_release.changelog]
+exclude_commit_patterns = [
+    "^chore\\(release\\)",
+    "^Merge",
+]
+
+[tool.semantic_release.remote]
+type = "github"
+token = { env = "GH_TOKEN" }

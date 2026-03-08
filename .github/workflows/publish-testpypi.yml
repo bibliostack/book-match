@@ -26,6 +26,14 @@ jobs:
       - name: Install build tools
         run: pip install build
 
+      - name: Append dev version suffix
+        run: |
+          VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          DEV_VERSION="${VERSION}.dev${TIMESTAMP}"
+          sed -i "s/^version = \"${VERSION}\"/version = \"${DEV_VERSION}\"/" pyproject.toml
+          echo "Publishing version: ${DEV_VERSION}"
+
       - name: Build sdist and wheel
         run: python -m build
 
