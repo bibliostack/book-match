@@ -10,8 +10,10 @@ from book_match.core.types import Book, MatchFactor, MatchResult, MatchVerdict
 from book_match.isbn.compare import isbn_match_score
 from book_match.matching.explainer import generate_explanation
 from book_match.matching.normalizers import (
+    normalize_author_list,
     normalize_authors,
     normalize_language,
+    normalize_publisher,
     normalize_title,
 )
 from book_match.matching.similarity import (
@@ -28,6 +30,22 @@ class BookMatcher:
     """Core book matching engine.
 
     Compares books and produces detailed, explainable match results.
+
+    Scoring Philosophy — Missing Data:
+        When metadata fields are absent, the engine applies neutral or small
+        scores rather than penalizing, since missing data is common across
+        metadata sources:
+
+        - **Title**: missing local = 0.1 (small bonus for enrichment),
+          missing remote = 0.0, both missing = 0.0.
+        - **Author**: missing local = 0.1, missing remote = 0.0,
+          both missing = 0.0.
+        - **Year**: either missing = 0.5 (neutral, does not push confidence
+          up or down).
+        - **Language**: either missing = 0.5 (neutral).
+
+        This means matches with incomplete metadata are not unfairly rejected,
+        but they also cannot reach high confidence without corroborating data.
 
     Example:
         >>> matcher = BookMatcher()
@@ -71,7 +89,14 @@ class BookMatcher:
         local_title: str | None,
         remote_title: str | None,
     ) -> MatchFactor:
-        """Compare book titles."""
+        """Compare book titles.
+
+        Missing data behavior:
+            - Both missing: similarity=0.0 (no signal).
+            - Local missing, remote present: similarity=0.1 (small bonus for
+              enrichment — remote provides data we lack).
+            - Remote missing: similarity=0.0 (no enrichment value).
+        """
         if not local_title and not remote_title:
             return MatchFactor(
                 name="title",
@@ -141,7 +166,13 @@ class BookMatcher:
         local_authors: tuple[str, ...],
         remote_authors: tuple[str, ...],
     ) -> MatchFactor:
-        """Compare author lists."""
+        """Compare author lists.
+
+        Missing data behavior:
+            - Both missing: similarity=0.0.
+            - Local missing, remote present: similarity=0.1 (enrichment bonus).
+            - Remote missing: similarity=0.0.
+        """
         if not local_authors and not remote_authors:
             return MatchFactor(
                 name="author",
@@ -172,11 +203,30 @@ class BookMatcher:
                 matched_values=(", ".join(local_authors), None),
             )
 
-        # Normalize and compare
-        local_norm = normalize_authors(local_authors)
-        remote_norm = normalize_authors(remote_authors)
+        # Pairwise comparison: for each author in the shorter list, find best
+        # match in the longer list. Penalize count mismatch.
+        local_list = normalize_author_list(local_authors)
+        remote_list = normalize_author_list(remote_authors)
 
-        similarity = self._author_similarity(local_norm, remote_norm)
+        if not local_list and not remote_list:
+            similarity = 0.0
+        elif not local_list or not remote_list:
+            similarity = 0.0
+        else:
+            shorter, longer = (
+                (local_list, remote_list)
+                if len(local_list) <= len(remote_list)
+                else (remote_list, local_list)
+            )
+            best_scores: list[float] = []
+            for author in shorter:
+                best = max(self._author_similarity(author, other) for other in longer)
+                best_scores.append(best)
+            avg_score = sum(best_scores) / len(best_scores)
+
+            # Penalize count mismatch (e.g., 1 author vs 3)
+            count_ratio = len(shorter) / len(longer)
+            similarity = avg_score * (0.7 + 0.3 * count_ratio)
 
         return MatchFactor(
             name="author",
@@ -192,8 +242,12 @@ class BookMatcher:
         local_year: int | None,
         remote_year: int | None,
     ) -> MatchFactor:
-        """Compare publication years."""
-        if not local_year or not remote_year:
+        """Compare publication years.
+
+        Missing data behavior: either year missing → similarity=0.5
+        (neutral, does not influence confidence in either direction).
+        """
+        if local_year is None or remote_year is None:
             return MatchFactor(
                 name="year",
                 similarity=0.5,  # Neutral when no data
@@ -201,8 +255,8 @@ class BookMatcher:
                 contribution=0.5 * self.config.year_weight,
                 details="Year information incomplete",
                 matched_values=(
-                    str(local_year) if local_year else None,
-                    str(remote_year) if remote_year else None,
+                    str(local_year) if local_year is not None else None,
+                    str(remote_year) if remote_year is not None else None,
                 ),
             )
 
@@ -231,7 +285,11 @@ class BookMatcher:
         local_lang: str | None,
         remote_lang: str | None,
     ) -> MatchFactor:
-        """Compare languages."""
+        """Compare languages.
+
+        Missing data behavior: either language missing (after normalization)
+        → similarity=0.5 (neutral).
+        """
         local_norm = normalize_language(local_lang)
         remote_norm = normalize_language(remote_lang)
 
@@ -263,6 +321,40 @@ class BookMatcher:
                 details="Languages differ",
                 matched_values=(local_norm, remote_norm),
             )
+
+    def _compare_publishers(
+        self,
+        local_publisher: str | None,
+        remote_publisher: str | None,
+    ) -> MatchFactor:
+        """Compare publisher names.
+
+        Missing data behavior: either publisher missing → similarity=0.5
+        (neutral). Uses token_set_ratio after stripping legal suffixes.
+        """
+        local_norm = normalize_publisher(local_publisher)
+        remote_norm = normalize_publisher(remote_publisher)
+
+        if not local_norm or not remote_norm:
+            return MatchFactor(
+                name="publisher",
+                similarity=0.5,
+                weight=self.config.publisher_weight,
+                contribution=0.5 * self.config.publisher_weight,
+                details="Publisher information incomplete",
+                matched_values=(local_publisher, remote_publisher),
+            )
+
+        similarity = token_set_ratio(local_norm, remote_norm)
+
+        return MatchFactor(
+            name="publisher",
+            similarity=similarity,
+            weight=self.config.publisher_weight,
+            contribution=similarity * self.config.publisher_weight,
+            details=f"Publisher similarity: {similarity:.0%}",
+            matched_values=(local_publisher, remote_publisher),
+        )
 
     def _compare_isbns(
         self,
@@ -367,6 +459,11 @@ class BookMatcher:
         language_factor = self._compare_languages(local.language, remote.language)
 
         factors.extend([title_factor, author_factor, year_factor, language_factor])
+
+        # Optional publisher factor (only when weight > 0)
+        if self.config.publisher_weight > 0:
+            publisher_factor = self._compare_publishers(local.publisher, remote.publisher)
+            factors.append(publisher_factor)
 
         # Calculate confidence
         confidence = sum(f.contribution for f in factors)

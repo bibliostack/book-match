@@ -40,6 +40,9 @@ class MatchConfig:
     strip_subtitles: bool = True
     strip_series_markers: bool = True
 
+    # Publisher matching (opt-in, default 0.0 so it does not affect existing scoring)
+    publisher_weight: float = 0.0
+
     # Year matching
     year_proximity_range: int = 2  # Years within this range get partial credit
 

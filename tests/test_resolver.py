@@ -2,7 +2,7 @@
 
 import pytest
 
-from book_match.core.types import Book, SearchQuery
+from book_match.core.types import Book, ResolveOutcome, SearchQuery, SourceStatus
 from book_match.sources.base import BaseSource
 from book_match.sources.resolver import BookResolver, ResolveStrategy
 
@@ -83,6 +83,31 @@ class TestResolveByISBN:
         assert results == []
 
 
+class TestResolveByISBNNormalization:
+    @pytest.mark.asyncio
+    async def test_sources_receive_normalized_isbn(self):
+        """Sources should receive the normalized ISBN, not the raw one."""
+        received_isbns: list[str] = []
+
+        class TrackingSource(BaseSource):
+            @property
+            def name(self) -> str:
+                return "tracking"
+
+            async def search(self, query: SearchQuery, limit: int = 10) -> list[Book]:
+                return []
+
+            async def fetch_by_isbn(self, isbn: str) -> Book | None:
+                received_isbns.append(isbn)
+                return Book(title="Test", isbn_13=isbn, source="tracking")
+
+        source = TrackingSource()
+        resolver = BookResolver(sources=[source])
+        await resolver.resolve_by_isbn("978-0-7432-7356-5")
+        assert len(received_isbns) == 1
+        assert received_isbns[0] == "9780743273565"  # No hyphens
+
+
 class TestStrategies:
     @pytest.mark.asyncio
     async def test_first_confident(self):
@@ -120,6 +145,92 @@ class TestStrategies:
         book = Book(title="Gatsby", authors=("Fitzgerald",))
         with pytest.raises(NotImplementedError):
             await resolver.resolve(book)
+
+
+class FailingSource(BaseSource):
+    """Source that raises a generic error."""
+
+    @property
+    def name(self) -> str:
+        return "failing"
+
+    async def search(self, query: SearchQuery, limit: int = 10) -> list[Book]:
+        raise RuntimeError("connection refused")
+
+    async def fetch_by_isbn(self, isbn: str) -> Book | None:
+        return None
+
+
+class TimeoutSource(BaseSource):
+    """Source that raises a timeout."""
+
+    @property
+    def name(self) -> str:
+        return "timeout"
+
+    async def search(self, query: SearchQuery, limit: int = 10) -> list[Book]:
+        raise TimeoutError("request timed out")
+
+    async def fetch_by_isbn(self, isbn: str) -> Book | None:
+        return None
+
+
+class TestResolveWithDiagnostics:
+    @pytest.mark.asyncio
+    async def test_success_diagnostic(self):
+        source = FakeSource(books=[Book(title="Gatsby", authors=("Fitzgerald",), source="fake")])
+        resolver = BookResolver(sources=[source])
+        outcome = await resolver.resolve_with_diagnostics(
+            Book(title="Gatsby", authors=("Fitzgerald",))
+        )
+        assert isinstance(outcome, ResolveOutcome)
+        assert len(outcome.source_diagnostics) == 1
+        diag = outcome.source_diagnostics[0]
+        assert diag.status == SourceStatus.SUCCESS
+        assert diag.result_count == 1
+        assert diag.duration_ms >= 0
+        assert diag.error_message is None
+
+    @pytest.mark.asyncio
+    async def test_timeout_diagnostic(self):
+        resolver = BookResolver(sources=[TimeoutSource()])
+        outcome = await resolver.resolve_with_diagnostics(Book(title="Test", authors=("Author",)))
+        assert len(outcome.source_diagnostics) == 1
+        diag = outcome.source_diagnostics[0]
+        assert diag.status == SourceStatus.TIMEOUT
+        assert diag.result_count == 0
+
+    @pytest.mark.asyncio
+    async def test_error_diagnostic(self):
+        resolver = BookResolver(sources=[FailingSource()])
+        outcome = await resolver.resolve_with_diagnostics(Book(title="Test", authors=("Author",)))
+        diag = outcome.source_diagnostics[0]
+        assert diag.status == SourceStatus.ERROR
+        assert "connection refused" in (diag.error_message or "")
+
+    @pytest.mark.asyncio
+    async def test_empty_query_returns_empty_outcome(self):
+        source = FakeSource()
+        resolver = BookResolver(sources=[source])
+        outcome = await resolver.resolve_with_diagnostics(Book())
+        assert outcome.results == []
+        assert outcome.source_diagnostics == ()
+
+    @pytest.mark.asyncio
+    async def test_mixed_sources(self):
+        good_source = FakeSource(
+            name="good",
+            books=[Book(title="Gatsby", authors=("Fitzgerald",), source="good")],
+        )
+        resolver = BookResolver(sources=[good_source, TimeoutSource(), FailingSource()])
+        outcome = await resolver.resolve_with_diagnostics(
+            Book(title="Gatsby", authors=("Fitzgerald",))
+        )
+        assert len(outcome.source_diagnostics) == 3
+        statuses = {d.source_name: d.status for d in outcome.source_diagnostics}
+        assert statuses["good"] == SourceStatus.SUCCESS
+        assert statuses["timeout"] == SourceStatus.TIMEOUT
+        assert statuses["failing"] == SourceStatus.ERROR
 
 
 class TestClose:

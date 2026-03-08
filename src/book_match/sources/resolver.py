@@ -4,11 +4,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Sequence
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-from book_match.core.types import Book, MatchResult, SearchQuery
+from book_match.core.types import (
+    Book,
+    MatchResult,
+    ResolveOutcome,
+    SearchQuery,
+    SourceDiagnostic,
+    SourceStatus,
+)
 from book_match.isbn.normalize import normalize_isbn
 from book_match.matching.engine import BookMatcher
 
@@ -154,6 +162,90 @@ class BookResolver:
 
         return results[:max_results]
 
+    async def _query_source_with_diagnostic(
+        self,
+        source: MetadataSource,
+        query: SearchQuery,
+        limit: int,
+    ) -> tuple[list[Book], SourceDiagnostic]:
+        """Query a single source and return results with diagnostic info."""
+        start = time.monotonic()
+        try:
+            results = await source.search(query, limit=limit)
+            elapsed = (time.monotonic() - start) * 1000
+            return results, SourceDiagnostic(
+                source_name=source.name,
+                status=SourceStatus.SUCCESS,
+                result_count=len(results),
+                duration_ms=elapsed,
+            )
+        except TimeoutError as e:
+            elapsed = (time.monotonic() - start) * 1000
+            return [], SourceDiagnostic(
+                source_name=source.name,
+                status=SourceStatus.TIMEOUT,
+                result_count=0,
+                duration_ms=elapsed,
+                error_message=str(e),
+            )
+        except Exception as e:
+            elapsed = (time.monotonic() - start) * 1000
+            return [], SourceDiagnostic(
+                source_name=source.name,
+                status=SourceStatus.ERROR,
+                result_count=0,
+                duration_ms=elapsed,
+                error_message=str(e),
+            )
+
+    async def resolve_with_diagnostics(
+        self,
+        book: Book,
+        min_confidence: float = 0.5,
+        max_results: int = 10,
+        query_limit: int = 10,
+    ) -> ResolveOutcome:
+        """Resolve a book against all sources, returning per-source diagnostics.
+
+        Same logic as resolve() but wraps results in a ResolveOutcome that
+        includes diagnostic information for each source query.
+
+        Args:
+            book: Book to find matches for
+            min_confidence: Minimum confidence to include
+            max_results: Maximum total results to return
+            query_limit: Maximum results per source query
+
+        Returns:
+            ResolveOutcome with results and source diagnostics
+        """
+        query = SearchQuery.from_book(book)
+
+        if query.is_empty:
+            return ResolveOutcome(results=[], source_diagnostics=())
+
+        tasks = [
+            self._query_source_with_diagnostic(source, query, query_limit)
+            for source in self.sources
+        ]
+        outcomes = await asyncio.gather(*tasks)
+
+        all_candidates: list[Book] = []
+        diagnostics: list[SourceDiagnostic] = []
+        for candidates, diagnostic in outcomes:
+            all_candidates.extend(candidates)
+            diagnostics.append(diagnostic)
+
+        if not all_candidates:
+            return ResolveOutcome(results=[], source_diagnostics=tuple(diagnostics))
+
+        results = self.matcher.match_many(book, all_candidates, min_confidence=min_confidence)
+
+        return ResolveOutcome(
+            results=results[:max_results],
+            source_diagnostics=tuple(diagnostics),
+        )
+
     async def resolve_by_isbn(
         self,
         isbn: str,
@@ -178,7 +270,7 @@ class BookResolver:
         )
 
         # Query sources for ISBN
-        tasks = [source.fetch_by_isbn(isbn) for source in self.sources]
+        tasks = [source.fetch_by_isbn(clean_isbn) for source in self.sources]
         source_results = await asyncio.gather(*tasks, return_exceptions=True)
 
         candidates = []

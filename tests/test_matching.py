@@ -106,6 +106,26 @@ class TestMaxConfidenceCap:
         assert result.confidence <= 0.97
 
 
+class TestYearZeroEdgeCase:
+    def test_year_zero_treated_as_valid(self, matcher):
+        """Year=0 should be treated as a valid year, not as missing."""
+        local = Book(title="Ancient Text", authors=("Unknown",), year=0)
+        remote = Book(title="Ancient Text", authors=("Unknown",), year=0)
+        result = matcher.match(local, remote)
+        year_factor = result.get_factor("year")
+        assert year_factor is not None
+        assert year_factor.similarity == 1.0
+
+    def test_year_zero_vs_nonzero(self, matcher):
+        """Year=0 vs year=2020 should compare as a real year difference."""
+        local = Book(title="Ancient Text", authors=("Unknown",), year=0)
+        remote = Book(title="Ancient Text", authors=("Unknown",), year=2020)
+        result = matcher.match(local, remote)
+        year_factor = result.get_factor("year")
+        assert year_factor is not None
+        assert year_factor.similarity < 0.5
+
+
 class TestMatchMany:
     def test_returns_sorted_results(self, matcher):
         local = Book(title="The Great Gatsby", authors=("Fitzgerald",))
@@ -144,6 +164,92 @@ class TestQuickScore:
         remote = Book(title="Same Title", authors=("Same Author",))
         score = matcher.quick_score(local, remote)
         assert score > 0.7
+
+
+class TestPublisherScoring:
+    def test_publisher_default_weight_no_effect(self, matcher):
+        """Default publisher_weight=0.0 means no publisher factor in results."""
+        local = Book(title="Test", authors=("Author",), publisher="Penguin")
+        remote = Book(title="Test", authors=("Author",), publisher="Vintage")
+        result = matcher.match(local, remote)
+        assert result.get_factor("publisher") is None
+
+    def test_publisher_match_with_weight(self):
+        config = MatchConfig(
+            publisher_weight=0.10,
+            title_weight=0.50,
+            author_weight=0.30,
+            year_weight=0.05,
+            language_weight=0.05,
+        )
+        m = BookMatcher(config)
+        local = Book(title="Test Book", authors=("Author",), publisher="Penguin Books")
+        remote = Book(title="Test Book", authors=("Author",), publisher="Penguin Books Inc.")
+        result = m.match(local, remote)
+        pub_factor = result.get_factor("publisher")
+        assert pub_factor is not None
+        assert pub_factor.similarity > 0.8
+
+    def test_publisher_mismatch_with_weight(self):
+        config = MatchConfig(
+            publisher_weight=0.10,
+            title_weight=0.50,
+            author_weight=0.30,
+            year_weight=0.05,
+            language_weight=0.05,
+        )
+        m = BookMatcher(config)
+        local = Book(title="Test Book", authors=("Author",), publisher="Penguin")
+        remote = Book(title="Test Book", authors=("Author",), publisher="HarperCollins")
+        result = m.match(local, remote)
+        pub_factor = result.get_factor("publisher")
+        assert pub_factor is not None
+        assert pub_factor.similarity < 0.5
+
+    def test_publisher_missing_neutral(self):
+        config = MatchConfig(
+            publisher_weight=0.10,
+            title_weight=0.50,
+            author_weight=0.30,
+            year_weight=0.05,
+            language_weight=0.05,
+        )
+        m = BookMatcher(config)
+        local = Book(title="Test Book", authors=("Author",), publisher="Penguin")
+        remote = Book(title="Test Book", authors=("Author",))
+        result = m.match(local, remote)
+        pub_factor = result.get_factor("publisher")
+        assert pub_factor is not None
+        assert pub_factor.similarity == 0.5
+
+
+class TestReasonCodes:
+    def test_isbn_match_reason(self, matcher, gatsby_local, gatsby_remote):
+        result = matcher.match(gatsby_local, gatsby_remote)
+        assert "ISBN_MATCH" in result.reason_codes
+
+    def test_title_author_reasons(self, matcher):
+        local = Book(
+            title="The Great Gatsby", authors=("F. Scott Fitzgerald",), language="en", year=1925
+        )
+        remote = Book(
+            title="The Great Gatsby", authors=("F. Scott Fitzgerald",), language="en", year=1925
+        )
+        result = matcher.match(local, remote)
+        codes = result.reason_codes
+        assert "TITLE_EXACT" in codes or "TITLE_STRONG" in codes
+        assert "AUTHOR_MATCH" in codes
+        assert "LANGUAGE_MATCH" in codes
+        assert "YEAR_MATCH" in codes
+
+    def test_weak_match_reasons(self, matcher):
+        local = Book(title="The Great Gatsby", authors=("Fitzgerald",), language="en", year=1925)
+        remote = Book(title="War and Peace", authors=("Tolstoy",), language="fr", year=1869)
+        result = matcher.match(local, remote)
+        codes = result.reason_codes
+        assert "TITLE_WEAK" in codes
+        assert "AUTHOR_WEAK" in codes
+        assert "LANGUAGE_MISMATCH" in codes
 
 
 class TestExplanation:

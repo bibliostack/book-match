@@ -69,9 +69,30 @@ class TestLink:
             Book(title="The Great Gatsby", authors=("Fitzgerald",)),
             Book(title="Great Gatsby", authors=("Fitzgerald",)),
         ]
-        batch = BatchMatcher()
+        batch = BatchMatcher(batch_config=BatchConfig(stream_results=False))
         results = list(batch.link(left, right))
-        # Should return at most one result per left book
+        # Non-streaming mode: at most one result per left book
+        assert len(results) <= 1
+
+    def test_streaming_yields_incrementally(self):
+        left = [Book(title="The Great Gatsby", authors=("Fitzgerald",))]
+        right = [
+            Book(title="The Great Gatsby", authors=("Fitzgerald",)),
+            Book(title="Great Gatsby", authors=("Fitzgerald",)),
+        ]
+        batch = BatchMatcher(batch_config=BatchConfig(stream_results=True))
+        iterator = batch.link(left, right)
+        first = next(iterator)
+        assert first.confidence > 0.5
+
+    def test_non_streaming_best_per_book(self):
+        left = [Book(title="The Great Gatsby", authors=("Fitzgerald",))]
+        right = [
+            Book(title="The Great Gatsby", authors=("Fitzgerald",)),
+            Book(title="Great Gatsby", authors=("Fitzgerald",)),
+        ]
+        batch = BatchMatcher(batch_config=BatchConfig(stream_results=False))
+        results = list(batch.link(left, right))
         assert len(results) <= 1
 
 

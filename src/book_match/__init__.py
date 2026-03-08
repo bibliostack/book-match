@@ -71,7 +71,10 @@ from book_match.core.types import (
     MatchFactor,
     MatchResult,
     MatchVerdict,
+    ResolveOutcome,
     SearchQuery,
+    SourceDiagnostic,
+    SourceStatus,
 )
 
 # ISBN utilities
@@ -94,8 +97,10 @@ from book_match.matching.engine import BookMatcher
 # Normalizers
 from book_match.matching.normalizers import (
     normalize_author,
+    normalize_author_list,
     normalize_authors,
     normalize_language,
+    normalize_publisher,
     normalize_text,
     normalize_title,
     strip_series_markers,
@@ -145,6 +150,9 @@ __all__ = [
     "MatchResult",
     "MatchVerdict",
     "SearchQuery",
+    "SourceStatus",
+    "SourceDiagnostic",
+    "ResolveOutcome",
     "BatchProgress",
     # Configuration
     "MatchConfig",
@@ -175,8 +183,10 @@ __all__ = [
     "normalize_text",
     "normalize_title",
     "normalize_author",
+    "normalize_author_list",
     "normalize_authors",
     "normalize_language",
+    "normalize_publisher",
     "strip_subtitle",
     "strip_series_markers",
     # Similarity

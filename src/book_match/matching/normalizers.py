@@ -194,6 +194,27 @@ def normalize_author(name: str | None) -> str:
     return normalize_text(result)
 
 
+def normalize_author_list(authors: list[str] | tuple[str, ...] | None) -> list[str]:
+    """Normalize a list of authors, returning individual normalized names.
+
+    Unlike normalize_authors(), this preserves the list structure for
+    pairwise comparison.
+
+    Args:
+        authors: List of author names
+
+    Returns:
+        List of normalized author names (sorted, empty strings removed)
+    """
+    if not authors:
+        return []
+
+    normalized = [normalize_author(a) for a in authors]
+    normalized = [a for a in normalized if a]
+    normalized.sort()
+    return normalized
+
+
 def normalize_authors(authors: list[str] | tuple[str, ...] | None) -> str:
     """Normalize a list of authors into a single comparable string.
 
@@ -206,16 +227,44 @@ def normalize_authors(authors: list[str] | tuple[str, ...] | None) -> str:
     Returns:
         Single normalized string of all authors
     """
-    if not authors:
+    return " ".join(normalize_author_list(authors))
+
+
+_PUBLISHER_SUFFIX_PATTERN = re.compile(
+    r",?\s*\b(?:"
+    r"Inc\.?|Ltd\.?|LLC|L\.?L\.?C\.?|"
+    r"Co\.?|Corp\.?|Corporation|Company|"
+    r"S\.?A\.?|S\.?L\.?|GmbH|AG|"
+    r"Publishing|Publishers|Press|Books|Editions|Verlag"
+    r")\s*$",
+    re.IGNORECASE,
+)
+
+
+def normalize_publisher(publisher: str | None) -> str:
+    """Normalize a publisher name for comparison.
+
+    Strips legal suffixes (Inc, Ltd, LLC, etc.) and common publishing
+    terms (Publishing, Press, Books) to improve matching across
+    different representations of the same publisher.
+
+    Args:
+        publisher: Publisher name
+
+    Returns:
+        Normalized publisher name, empty string if None/empty
+    """
+    if not publisher:
         return ""
 
-    normalized = [normalize_author(a) for a in authors]
-    normalized = [a for a in normalized if a]  # Remove empty
+    result = publisher.strip()
+    for _ in range(3):
+        new_result = _PUBLISHER_SUFFIX_PATTERN.sub("", result).strip()
+        if new_result == result:
+            break
+        result = new_result
 
-    # Sort to handle different orderings
-    normalized.sort()
-
-    return " ".join(normalized)
+    return normalize_text(result)
 
 
 def normalize_language(language: str | None) -> str:

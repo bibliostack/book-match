@@ -199,63 +199,109 @@ class BatchMatcher:
         # Track best match for each left book
         best_matches: dict[int, MatchResult] = {}
 
-        # Compare across blocks
-        for block_key in overlapping_keys:
-            left_indices = left_blocks[block_key]
-            right_indices = right_blocks[block_key]
+        if self.config.stream_results:
+            # Streaming mode: yield matches immediately as found
+            yielded_pairs: set[tuple[int, int]] = set()
+            matches_found = 0
 
-            for left_idx in left_indices:
-                for right_idx in right_indices:
-                    left_book = left[left_idx]
-                    right_book = right[right_idx]
+            for block_key in overlapping_keys:
+                left_indices = left_blocks[block_key]
+                right_indices = right_blocks[block_key]
 
-                    # Quick filter
-                    score = self.matcher.quick_score(left_book, right_book)
-                    if score >= self.config.min_confidence:
-                        result = self.matcher.match(left_book, right_book)
+                for left_idx in left_indices:
+                    for right_idx in right_indices:
+                        pair = (left_idx, right_idx)
+                        if pair in yielded_pairs:
+                            completed += 1
+                            continue
 
-                        if result.confidence >= self.config.min_confidence:
-                            # Track best match per left book
-                            if left_idx not in best_matches:
-                                best_matches[left_idx] = result
-                            elif result.confidence > best_matches[left_idx].confidence:
-                                best_matches[left_idx] = result
+                        left_book = left[left_idx]
+                        right_book = right[right_idx]
 
-                    completed += 1
+                        score = self.matcher.quick_score(left_book, right_book)
+                        if score >= self.config.min_confidence:
+                            result = self.matcher.match(left_book, right_book)
+                            if result.confidence >= self.config.min_confidence:
+                                yielded_pairs.add(pair)
+                                matches_found += 1
+                                yield result
 
-                    # Progress callback
-                    if on_progress and completed % 100 == 0:
-                        elapsed = time.time() - start_time
-                        on_progress(
-                            BatchProgress(
-                                total=total_comparisons,
-                                completed=completed,
-                                matches_found=len(best_matches),
-                                elapsed_seconds=elapsed,
+                        completed += 1
+
+                        if on_progress and completed % 100 == 0:
+                            elapsed = time.time() - start_time
+                            on_progress(
+                                BatchProgress(
+                                    total=total_comparisons,
+                                    completed=completed,
+                                    matches_found=matches_found,
+                                    elapsed_seconds=elapsed,
+                                )
                             )
-                        )
 
-        # Yield results sorted by confidence
-        sorted_matches = sorted(
-            best_matches.values(),
-            key=lambda r: r.confidence,
-            reverse=True,
-        )
-
-        for result in sorted_matches:
-            yield result
-
-        # Final progress
-        if on_progress:
-            elapsed = time.time() - start_time
-            on_progress(
-                BatchProgress(
-                    total=total_comparisons,
-                    completed=completed,
-                    matches_found=len(best_matches),
-                    elapsed_seconds=elapsed,
+            if on_progress:
+                elapsed = time.time() - start_time
+                on_progress(
+                    BatchProgress(
+                        total=total_comparisons,
+                        completed=completed,
+                        matches_found=matches_found,
+                        elapsed_seconds=elapsed,
+                    )
                 )
+        else:
+            # Non-streaming mode: collect best match per left book, then yield sorted
+            for block_key in overlapping_keys:
+                left_indices = left_blocks[block_key]
+                right_indices = right_blocks[block_key]
+
+                for left_idx in left_indices:
+                    for right_idx in right_indices:
+                        left_book = left[left_idx]
+                        right_book = right[right_idx]
+
+                        score = self.matcher.quick_score(left_book, right_book)
+                        if score >= self.config.min_confidence:
+                            result = self.matcher.match(left_book, right_book)
+
+                            if result.confidence >= self.config.min_confidence:
+                                if left_idx not in best_matches:
+                                    best_matches[left_idx] = result
+                                elif result.confidence > best_matches[left_idx].confidence:
+                                    best_matches[left_idx] = result
+
+                        completed += 1
+
+                        if on_progress and completed % 100 == 0:
+                            elapsed = time.time() - start_time
+                            on_progress(
+                                BatchProgress(
+                                    total=total_comparisons,
+                                    completed=completed,
+                                    matches_found=len(best_matches),
+                                    elapsed_seconds=elapsed,
+                                )
+                            )
+
+            sorted_matches = sorted(
+                best_matches.values(),
+                key=lambda r: r.confidence,
+                reverse=True,
             )
+
+            for result in sorted_matches:
+                yield result
+
+            if on_progress:
+                elapsed = time.time() - start_time
+                on_progress(
+                    BatchProgress(
+                        total=total_comparisons,
+                        completed=completed,
+                        matches_found=len(best_matches),
+                        elapsed_seconds=elapsed,
+                    )
+                )
 
     def find_matches(
         self,

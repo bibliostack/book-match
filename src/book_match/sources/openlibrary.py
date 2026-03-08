@@ -11,6 +11,7 @@ import logging
 import re
 from typing import Any
 
+from book_match.core.config import SourceConfig
 from book_match.core.exceptions import SourceRequestError
 from book_match.core.types import Book, SearchQuery
 from book_match.isbn.normalize import normalize_isbn
@@ -46,19 +47,23 @@ class OpenLibrarySource(BaseSource):
         self,
         timeout: float = 10.0,
         max_retries: int = 3,
+        config: SourceConfig | None = None,
     ):
         """Initialize the OpenLibrary source.
 
         Args:
             timeout: Request timeout in seconds
             max_retries: Maximum number of retry attempts
+            config: Optional SourceConfig that overrides individual parameters
         """
         if httpx is None:
             raise ImportError(
                 "httpx is required for OpenLibrarySource. Install it with: pip install httpx"
             )
-        self.timeout = timeout
-        self.max_retries = max_retries
+        self.timeout = config.timeout_seconds if config else timeout
+        self.max_retries = config.max_retries if config else max_retries
+        self._retry_delay = config.retry_delay_seconds if config else 1.0
+        self._prefer_isbn_lookup = config.prefer_isbn_lookup if config else True
         self._client: httpx.AsyncClient | None = None
 
     @property
@@ -91,11 +96,11 @@ class OpenLibrarySource(BaseSource):
                     return {}  # Not found
                 last_error = e
                 if attempt < self.max_retries - 1:
-                    await asyncio.sleep(1.0 * (attempt + 1))
+                    await asyncio.sleep(self._retry_delay * (attempt + 1))
             except httpx.RequestError as e:
                 last_error = e
                 if attempt < self.max_retries - 1:
-                    await asyncio.sleep(1.0 * (attempt + 1))
+                    await asyncio.sleep(self._retry_delay * (attempt + 1))
 
         raise SourceRequestError(
             self.name,

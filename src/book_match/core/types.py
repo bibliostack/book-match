@@ -6,6 +6,15 @@ from dataclasses import dataclass, replace
 from enum import Enum
 
 
+class SourceStatus(Enum):
+    """Status of a metadata source query."""
+
+    SUCCESS = "success"
+    TIMEOUT = "timeout"
+    RATE_LIMITED = "rate_limited"
+    ERROR = "error"
+
+
 class MatchVerdict(Enum):
     """Verdict for a match result."""
 
@@ -115,6 +124,49 @@ class MatchResult:
                 return factor
         return None
 
+    @property
+    def reason_codes(self) -> tuple[str, ...]:
+        """Machine-readable reason codes derived from match factors.
+
+        Returns a stable, deterministic tuple of codes describing the match.
+        """
+        codes: list[str] = []
+        for factor in self.factors:
+            code = _factor_to_reason_code(factor)
+            if code:
+                codes.append(code)
+        return tuple(codes)
+
+
+def _factor_to_reason_code(factor: MatchFactor) -> str | None:
+    """Map a MatchFactor to a machine-readable reason code."""
+    name = factor.name
+    sim = factor.similarity
+
+    if name == "isbn":
+        return "ISBN_MATCH" if sim >= 1.0 else "ISBN_MISMATCH"
+    elif name == "title":
+        if sim >= 0.95:
+            return "TITLE_EXACT"
+        elif sim >= 0.80:
+            return "TITLE_STRONG"
+        else:
+            return "TITLE_WEAK"
+    elif name == "author":
+        return "AUTHOR_MATCH" if sim >= 0.90 else "AUTHOR_WEAK"
+    elif name == "language":
+        return "LANGUAGE_MATCH" if sim >= 1.0 else "LANGUAGE_MISMATCH"
+    elif name == "year":
+        if sim >= 1.0:
+            return "YEAR_MATCH"
+        elif sim >= 0.8:
+            return "YEAR_CLOSE"
+        else:
+            return "YEAR_MISMATCH"
+    elif name == "publisher":
+        return "PUBLISHER_MATCH" if sim >= 0.80 else "PUBLISHER_WEAK"
+    return None
+
 
 @dataclass(frozen=True, slots=True)
 class SearchQuery:
@@ -139,6 +191,25 @@ class SearchQuery:
     def is_empty(self) -> bool:
         """Check if query has no search terms."""
         return not (self.title or self.authors or self.isbn)
+
+
+@dataclass(frozen=True, slots=True)
+class SourceDiagnostic:
+    """Diagnostic information from a single source query."""
+
+    source_name: str
+    status: SourceStatus
+    result_count: int
+    duration_ms: float
+    error_message: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ResolveOutcome:
+    """Complete outcome of a resolve operation with per-source diagnostics."""
+
+    results: list[MatchResult]
+    source_diagnostics: tuple[SourceDiagnostic, ...]
 
 
 @dataclass
