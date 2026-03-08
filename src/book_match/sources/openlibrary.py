@@ -10,6 +10,7 @@ import asyncio
 import logging
 import re
 from typing import Any
+from urllib.parse import urlparse
 
 from book_match.core.config import SourceConfig
 from book_match.core.exceptions import SourceRequestError
@@ -89,8 +90,6 @@ class OpenLibrarySource(BaseSource):
         if response.is_redirect or response.has_redirect_location:
             location = response.headers.get("location", "")
             if location.startswith("http"):
-                from urllib.parse import urlparse
-
                 parsed = urlparse(location)
                 if parsed.hostname and parsed.hostname not in self._ALLOWED_REDIRECT_HOSTS:
                     raise SourceRequestError(

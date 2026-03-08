@@ -56,6 +56,8 @@ from book_match.core.config import BatchConfig, MatchConfig, SourceConfig
 
 # Exceptions
 from book_match.core.exceptions import (
+    BatchError,
+    BlockingError,
     BookMatchError,
     ConfigurationError,
     InvalidISBNError,
@@ -170,6 +172,8 @@ __all__ = [
     "SourceRequestError",
     "SourceRateLimitError",
     "ConfigurationError",
+    "BatchError",
+    "BlockingError",
     # Matching
     "BookMatcher",
     # ISBN

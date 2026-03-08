@@ -243,6 +243,20 @@ class TestExplainYearFactor:
         result = explain_year_factor(factor)
         assert "close" in result.lower()
 
+    def test_close_years_custom_range(self):
+        factor = MatchFactor(
+            name="year",
+            similarity=0.8,
+            weight=0.05,
+            contribution=0.04,
+            details="",
+            matched_values=("2020", "2024"),
+        )
+        # 4-year diff is "different" with default range=2
+        assert "differ" in explain_year_factor(factor).lower()
+        # but "close" with lenient range=5
+        assert "close" in explain_year_factor(factor, year_proximity_range=5).lower()
+
     def test_different_years(self):
         factor = MatchFactor(
             name="year",

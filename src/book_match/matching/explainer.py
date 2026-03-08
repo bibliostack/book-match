@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from book_match.core.types import Book, MatchFactor, MatchVerdict
 
 
@@ -92,15 +94,21 @@ def explain_isbn_factor(factor: MatchFactor) -> str:
         return "No ISBN available for verification"
 
 
-def explain_year_factor(factor: MatchFactor) -> str:
-    """Generate explanation for year comparison."""
+def explain_year_factor(factor: MatchFactor, year_proximity_range: int = 2) -> str:
+    """Generate explanation for year comparison.
+
+    Args:
+        factor: The year match factor.
+        year_proximity_range: Years within this range are considered "close".
+            Should match ``MatchConfig.year_proximity_range`` for consistency.
+    """
     if factor.matched_values:
         local, remote = factor.matched_values
         if local == remote:
             return f"Publication year matches: {local}"
         else:
             diff = abs(int(local) - int(remote)) if local and remote else 0
-            if diff <= 5:
+            if diff <= year_proximity_range:
                 return f"Publication years close: {local} vs {remote} ({diff} year difference)"
             else:
                 return f"Publication years differ: {local} vs {remote}"
@@ -151,16 +159,23 @@ def explain_publisher_factor(factor: MatchFactor) -> str:
     return f"Publisher {sim_desc} match ({pct})"
 
 
-def explain_factor(factor: MatchFactor) -> str:
-    """Generate human-readable explanation for a match factor."""
-    explainers = {
+def explain_factor(factor: MatchFactor, year_proximity_range: int = 2) -> str:
+    """Generate human-readable explanation for a match factor.
+
+    Args:
+        factor: The match factor to explain.
+        year_proximity_range: Passed through to ``explain_year_factor``.
+    """
+    explainers: dict[str, Callable[[MatchFactor], str]] = {
         "title": explain_title_factor,
         "author": explain_author_factor,
         "isbn": explain_isbn_factor,
-        "year": explain_year_factor,
         "language": explain_language_factor,
         "publisher": explain_publisher_factor,
     }
+
+    if factor.name == "year":
+        return explain_year_factor(factor, year_proximity_range=year_proximity_range)
 
     explainer = explainers.get(factor.name)
     if explainer:

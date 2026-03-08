@@ -10,7 +10,7 @@ import re
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
-from book_match.matching.normalizers import normalize_language
+from book_match.matching.normalizers import TITLE_ARTICLES, normalize_language
 
 if TYPE_CHECKING:
     from book_match.core.types import Book
@@ -77,14 +77,15 @@ class TitlePrefix(BlockingRule):
 
     Args:
         prefix_length: Number of characters to use (default 4)
-        strip_articles: Remove leading articles (the, a, an)
+        strip_articles: Remove leading articles in multiple languages
+            (English, Spanish, French, German)
     """
 
     def __init__(self, prefix_length: int = 4, strip_articles: bool = True):
         self.prefix_length = prefix_length
         self.strip_articles = strip_articles
         self._article_pattern = re.compile(
-            r"^(the|a|an|el|la|le|les|das|der|die|ein|eine)\s+", re.IGNORECASE
+            r"^(" + "|".join(TITLE_ARTICLES) + r")\s+", re.IGNORECASE
         )
 
     @property
@@ -113,10 +114,10 @@ class TitlePrefix(BlockingRule):
 class TitleFirstWord(BlockingRule):
     """Block on the first significant word of the title.
 
-    Skips common articles (the, a, an).
+    Skips common articles in multiple languages (see ``TITLE_ARTICLES``).
     """
 
-    _ARTICLES = {"the", "a", "an", "el", "la", "le", "les", "der", "die", "das", "ein", "eine"}
+    _ARTICLES = TITLE_ARTICLES
 
     @property
     def name(self) -> str:
