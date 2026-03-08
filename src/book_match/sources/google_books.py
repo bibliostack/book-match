@@ -209,8 +209,8 @@ class GoogleBooksSource(BaseSource):
         # Build search query
         query_parts = []
 
-        # ISBN search is most reliable
-        if query.isbn:
+        # ISBN search is most reliable (when prefer_isbn_lookup is enabled)
+        if self._prefer_isbn_lookup and query.isbn:
             normalized = normalize_isbn(query.isbn)
             if normalized:
                 query_parts.append(f"isbn:{normalized}")

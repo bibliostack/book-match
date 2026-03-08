@@ -207,8 +207,8 @@ class OpenLibrarySource(BaseSource):
             "fields": "key,title,author_name,isbn,first_publish_year,language,publisher,edition_key",
         }
 
-        # Prefer ISBN search if available
-        if query.isbn:
+        # Prefer ISBN search if available (when prefer_isbn_lookup is enabled)
+        if self._prefer_isbn_lookup and query.isbn:
             normalized = normalize_isbn(query.isbn)
             if normalized:
                 # Direct ISBN lookup is more reliable

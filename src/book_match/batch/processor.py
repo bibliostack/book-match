@@ -125,11 +125,14 @@ class BatchMatcher:
             chunks = [all_pairs[i : i + chunk_size] for i in range(0, len(all_pairs), chunk_size)]
 
             with ThreadPoolExecutor(max_workers=self.config.max_workers) as executor:
-                futures = [executor.submit(self._compare_pairs, books, chunk) for chunk in chunks]
+                futures_with_sizes = [
+                    (executor.submit(self._compare_pairs, books, chunk), len(chunk))
+                    for chunk in chunks
+                ]
 
-                for future in futures:
+                for future, chunk_len in futures_with_sizes:
                     chunk_results = future.result()
-                    completed += len(chunks[futures.index(future)])
+                    completed += chunk_len
                     for result in chunk_results:
                         matches_found += 1
                         yield result
@@ -251,14 +254,17 @@ class BatchMatcher:
                     all_pairs[i : i + chunk_size] for i in range(0, len(all_pairs), chunk_size)
                 ]
                 with ThreadPoolExecutor(max_workers=self.config.max_workers) as executor:
-                    futures = [
-                        executor.submit(self._compare_link_pairs, left, right, chunk)
+                    futures_with_sizes = [
+                        (
+                            executor.submit(self._compare_link_pairs, left, right, chunk),
+                            len(chunk),
+                        )
                         for chunk in chunks
                     ]
-                    for future in futures:
+                    for future, chunk_len in futures_with_sizes:
                         chunk_results = future.result()
-                        completed += len(chunks[futures.index(future)])
-                        for result in chunk_results:
+                        completed += chunk_len
+                        for _left_idx, result in chunk_results:
                             matches_found += 1
                             yield result
                         if on_progress:
@@ -322,18 +328,11 @@ class BatchMatcher:
                     ]
                     for future in futures:
                         chunk_results = future.result()
-                        for result in chunk_results:
-                            # Find left_idx by matching local_book
-                            found_idx: int | None = next(
-                                (i for i, b in enumerate(left) if b is result.local_book),
-                                None,
-                            )
-                            if found_idx is not None:
-                                left_idx = found_idx
-                                if left_idx not in best_matches:
-                                    best_matches[left_idx] = result
-                                elif result.confidence > best_matches[left_idx].confidence:
-                                    best_matches[left_idx] = result
+                        for left_idx, result in chunk_results:
+                            if left_idx not in best_matches:
+                                best_matches[left_idx] = result
+                            elif result.confidence > best_matches[left_idx].confidence:
+                                best_matches[left_idx] = result
             else:
                 for left_idx, right_idx in all_pairs:
                     left_book = left[left_idx]
@@ -386,15 +385,19 @@ class BatchMatcher:
         left: Sequence[Book],
         right: Sequence[Book],
         pairs: list[tuple[int, int]],
-    ) -> list[MatchResult]:
-        """Compare a batch of cross-dataset pairs. Used for parallel link()."""
-        results: list[MatchResult] = []
+    ) -> list[tuple[int, MatchResult]]:
+        """Compare a batch of cross-dataset pairs. Used for parallel link().
+
+        Returns list of (left_idx, MatchResult) tuples so callers can
+        identify which left book each result belongs to without a linear scan.
+        """
+        results: list[tuple[int, MatchResult]] = []
         for left_idx, right_idx in pairs:
             score = self.matcher.quick_score(left[left_idx], right[right_idx])
             if score >= self.config.min_confidence:
                 result = self.matcher.match(left[left_idx], right[right_idx])
                 if result.confidence >= self.config.min_confidence:
-                    results.append(result)
+                    results.append((left_idx, result))
         return results
 
     def find_matches(

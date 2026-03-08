@@ -223,7 +223,7 @@ class SourceDiagnostic:
 class ResolveOutcome:
     """Complete outcome of a resolve operation with per-source diagnostics."""
 
-    results: list[MatchResult]
+    results: tuple[MatchResult, ...]
     source_diagnostics: tuple[SourceDiagnostic, ...]
 
 

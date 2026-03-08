@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
+from book_match.core.exceptions import SourceRateLimitError
 from book_match.core.types import (
     Book,
     MatchResult,
@@ -180,30 +181,31 @@ class BookResolver:
             # Not enough sources to apply consensus — fall back to BEST_MATCH
             return results
 
-        # Group candidates by identity using quick_score.
-        # Each group collects candidates that match each other.
+        # Group candidates by identity using full match() to avoid
+        # quick_score's ISBN short-circuit missing title/author matches.
         groups: list[list[Book]] = []
         for candidate in all_candidates:
             placed = False
             for group in groups:
-                score = self.matcher.quick_score(group[0], candidate)
-                if score >= 0.80:
+                result = self.matcher.match(group[0], candidate)
+                if result.confidence >= 0.80:
                     group.append(candidate)
                     placed = True
                     break
             if not placed:
                 groups.append([candidate])
 
-        # Find candidates that appear in enough distinct sources
-        consensus_candidates: set[int] = set()
+        # Find candidates that appear in enough distinct sources.
+        # Book is a frozen dataclass (hashable), so use set[Book] directly.
+        consensus_candidates: set[Book] = set()
         for group in groups:
             distinct_sources = {b.source for b in group if b.source}
             if len(distinct_sources) >= self.min_agreeing_sources:
                 for b in group:
-                    consensus_candidates.add(id(b))
+                    consensus_candidates.add(b)
 
         # Filter results to only consensus candidates
-        filtered = [r for r in results if id(r.remote_book) in consensus_candidates]
+        filtered = [r for r in results if r.remote_book in consensus_candidates]
         return filtered
 
     async def _query_source_with_diagnostic(
@@ -228,6 +230,15 @@ class BookResolver:
             return [], SourceDiagnostic(
                 source_name=source.name,
                 status=SourceStatus.TIMEOUT,
+                result_count=0,
+                duration_ms=elapsed,
+                error_message=str(e),
+            )
+        except SourceRateLimitError as e:
+            elapsed = (time.monotonic() - start) * 1000
+            return [], SourceDiagnostic(
+                source_name=source.name,
+                status=SourceStatus.RATE_LIMITED,
                 result_count=0,
                 duration_ms=elapsed,
                 error_message=str(e),
@@ -266,7 +277,7 @@ class BookResolver:
         query = SearchQuery.from_book(book)
 
         if query.is_empty:
-            return ResolveOutcome(results=[], source_diagnostics=())
+            return ResolveOutcome(results=(), source_diagnostics=())
 
         tasks = [
             self._query_source_with_diagnostic(source, query, query_limit)
@@ -281,12 +292,39 @@ class BookResolver:
             diagnostics.append(diagnostic)
 
         if not all_candidates:
-            return ResolveOutcome(results=[], source_diagnostics=tuple(diagnostics))
+            return ResolveOutcome(results=(), source_diagnostics=tuple(diagnostics))
 
         results = self.matcher.match_many(book, all_candidates, min_confidence=min_confidence)
 
+        # Apply the configured strategy (same logic as resolve())
+        if self.strategy == ResolveStrategy.FIRST_CONFIDENT:
+            for result in results:
+                if result.should_auto_accept:
+                    return ResolveOutcome(
+                        results=(result,),
+                        source_diagnostics=tuple(diagnostics),
+                    )
+
+        elif self.strategy == ResolveStrategy.ALL_SOURCES:
+            best_by_source: dict[str, MatchResult] = {}
+            for result in results:
+                source = result.remote_book.source
+                if source:
+                    if source not in best_by_source:
+                        best_by_source[source] = result
+                    elif result.confidence > best_by_source[source].confidence:
+                        best_by_source[source] = result
+            results = sorted(
+                best_by_source.values(),
+                key=lambda r: r.confidence,
+                reverse=True,
+            )
+
+        elif self.strategy == ResolveStrategy.CONSENSUS:
+            results = self._apply_consensus(results, all_candidates)
+
         return ResolveOutcome(
-            results=results[:max_results],
+            results=tuple(results[:max_results]),
             source_diagnostics=tuple(diagnostics),
         )
 

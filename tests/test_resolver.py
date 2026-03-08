@@ -2,6 +2,7 @@
 
 import pytest
 
+from book_match.core.exceptions import SourceRateLimitError
 from book_match.core.types import Book, ResolveOutcome, SearchQuery, SourceStatus
 from book_match.sources.base import BaseSource
 from book_match.sources.resolver import BookResolver, ResolveStrategy
@@ -219,6 +220,20 @@ class TimeoutSource(BaseSource):
         return None
 
 
+class RateLimitedSource(BaseSource):
+    """Source that raises a rate limit error."""
+
+    @property
+    def name(self) -> str:
+        return "rate_limited"
+
+    async def search(self, query: SearchQuery, limit: int = 10) -> list[Book]:
+        raise SourceRateLimitError("rate_limited", 60.0)
+
+    async def fetch_by_isbn(self, isbn: str) -> Book | None:
+        return None
+
+
 class TestResolveWithDiagnostics:
     @pytest.mark.asyncio
     async def test_success_diagnostic(self):
@@ -245,6 +260,15 @@ class TestResolveWithDiagnostics:
         assert diag.result_count == 0
 
     @pytest.mark.asyncio
+    async def test_rate_limited_diagnostic(self):
+        resolver = BookResolver(sources=[RateLimitedSource()])
+        outcome = await resolver.resolve_with_diagnostics(Book(title="Test", authors=("Author",)))
+        assert len(outcome.source_diagnostics) == 1
+        diag = outcome.source_diagnostics[0]
+        assert diag.status == SourceStatus.RATE_LIMITED
+        assert diag.result_count == 0
+
+    @pytest.mark.asyncio
     async def test_error_diagnostic(self):
         resolver = BookResolver(sources=[FailingSource()])
         outcome = await resolver.resolve_with_diagnostics(Book(title="Test", authors=("Author",)))
@@ -257,7 +281,7 @@ class TestResolveWithDiagnostics:
         source = FakeSource()
         resolver = BookResolver(sources=[source])
         outcome = await resolver.resolve_with_diagnostics(Book())
-        assert outcome.results == []
+        assert outcome.results == ()
         assert outcome.source_diagnostics == ()
 
     @pytest.mark.asyncio
