@@ -83,7 +83,9 @@ class TitlePrefix(BlockingRule):
     def __init__(self, prefix_length: int = 4, strip_articles: bool = True):
         self.prefix_length = prefix_length
         self.strip_articles = strip_articles
-        self._article_pattern = re.compile(r"^(the|a|an)\s+", re.IGNORECASE)
+        self._article_pattern = re.compile(
+            r"^(the|a|an|el|la|le|les|das|der|die|ein|eine)\s+", re.IGNORECASE
+        )
 
     @property
     def name(self) -> str:
@@ -114,7 +116,7 @@ class TitleFirstWord(BlockingRule):
     Skips common articles (the, a, an).
     """
 
-    _ARTICLES = {"the", "a", "an", "el", "la", "le", "les", "der", "die", "das"}
+    _ARTICLES = {"the", "a", "an", "el", "la", "le", "les", "der", "die", "das", "ein", "eine"}
 
     @property
     def name(self) -> str:
@@ -190,7 +192,7 @@ class YearRange(BlockingRule):
         return f"year_range_{self.range_size}"
 
     def blocking_key(self, book: Book) -> str | None:
-        if not book.year:
+        if book.year is None:
             return None
 
         # Round down to range start
@@ -219,12 +221,20 @@ class LanguageBlock(BlockingRule):
 class CompositeBlock(BlockingRule):
     """Combine multiple blocking rules.
 
-    Generates a composite key from multiple rules.
+    When ``require_all`` is True (default), all rules must produce a key
+    for the composite to emit a key (AND semantics). When False, any
+    single rule producing a key is sufficient (OR semantics).
     """
 
-    def __init__(self, rules: list[BlockingRule], separator: str = "|"):
+    def __init__(
+        self,
+        rules: list[BlockingRule],
+        separator: str = "|",
+        require_all: bool = True,
+    ):
         self.rules = rules
         self.separator = separator
+        self.require_all = require_all
 
     @property
     def name(self) -> str:
@@ -236,6 +246,8 @@ class CompositeBlock(BlockingRule):
             key = rule.blocking_key(book)
             if key:
                 keys.append(key)
+            elif self.require_all:
+                return None  # AND semantics: all must produce a key
 
         if not keys:
             return None

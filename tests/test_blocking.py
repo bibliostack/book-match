@@ -70,6 +70,13 @@ class TestYearRange:
         book = Book(title="Test")
         assert YearRange(5).blocking_key(book) is None
 
+    def test_year_zero_not_missing(self):
+        """Year=0 should produce a blocking key, not be treated as missing."""
+        book = Book(year=0)
+        key = YearRange(5).blocking_key(book)
+        assert key is not None
+        assert key == "0"
+
 
 class TestLanguageBlock:
     def test_english(self):
@@ -102,3 +109,25 @@ class TestCompositeBlock:
         book = Book()
         rule = CompositeBlock([TitleFirstWord(), FirstAuthorSurname()])
         assert rule.blocking_key(book) is None
+
+    def test_require_all_missing_one(self):
+        """AND semantics: missing one rule's key returns None."""
+        book = Book(title="The Great Gatsby")  # No author
+        rule = CompositeBlock([TitleFirstWord(), FirstAuthorSurname()], require_all=True)
+        assert rule.blocking_key(book) is None
+
+    def test_or_semantics(self):
+        """OR semantics: any single rule producing a key is enough."""
+        book = Book(title="The Great Gatsby")  # No author
+        rule = CompositeBlock([TitleFirstWord(), FirstAuthorSurname()], require_all=False)
+        key = rule.blocking_key(book)
+        assert key is not None
+        assert key == "great"
+
+    def test_or_semantics_all_present(self):
+        """OR semantics with all keys present still combines them."""
+        book = Book(title="The Great Gatsby", authors=("Fitzgerald",))
+        rule = CompositeBlock([TitleFirstWord(), FirstAuthorSurname()], require_all=False)
+        key = rule.blocking_key(book)
+        assert key is not None
+        assert "|" in key

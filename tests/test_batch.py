@@ -96,6 +96,110 @@ class TestLink:
         assert len(results) <= 1
 
 
+class TestParallelDeduplicate:
+    """Tests for parallel batch deduplication — issue #35."""
+
+    def test_parallel_finds_same_results(self):
+        """Parallel dedup should find the same duplicates as serial."""
+        books = [
+            Book(title="The Great Gatsby", authors=("F. Scott Fitzgerald",)),
+            Book(title="The Great Gatsby", authors=("Fitzgerald, F. Scott",)),
+            Book(title="War and Peace", authors=("Leo Tolstoy",)),
+            Book(title="War and Peace", authors=("Tolstoy",)),
+        ]
+        serial_config = BatchConfig(max_workers=1)
+        parallel_config = BatchConfig(max_workers=2, chunk_size=1)
+
+        serial_results = list(BatchMatcher(batch_config=serial_config).deduplicate(books))
+        parallel_results = list(BatchMatcher(batch_config=parallel_config).deduplicate(books))
+
+        # Should find same number of duplicates
+        assert len(parallel_results) == len(serial_results)
+
+    def test_parallel_progress_tracking(self):
+        """Progress callback should be called during parallel dedup."""
+        books = [
+            Book(title="The Great Gatsby", authors=("Fitzgerald",)),
+            Book(title="The Great Gatsby", authors=("Fitzgerald",)),
+            Book(title="Gatsby", authors=("Fitzgerald",)),
+        ]
+        progress_calls: list[BatchProgress] = []
+        config = BatchConfig(max_workers=2, chunk_size=1)
+        batch = BatchMatcher(batch_config=config)
+        list(batch.deduplicate(books, on_progress=progress_calls.append))
+        assert len(progress_calls) >= 1
+        # Final progress should show all completed
+        final = progress_calls[-1]
+        assert final.completed == final.total
+
+    def test_parallel_empty_input(self):
+        """Parallel dedup with empty input should work."""
+        config = BatchConfig(max_workers=2)
+        batch = BatchMatcher(batch_config=config)
+        results = list(batch.deduplicate([]))
+        assert results == []
+
+
+class TestParallelLink:
+    """Tests for parallel batch linkage — issue #35."""
+
+    def test_parallel_link_streaming(self):
+        """Parallel streaming link should find matches."""
+        left = [
+            Book(title="The Great Gatsby", authors=("Fitzgerald",)),
+            Book(title="War and Peace", authors=("Tolstoy",)),
+        ]
+        right = [
+            Book(title="The Great Gatsby", authors=("F. Scott Fitzgerald",)),
+            Book(title="War and Peace", authors=("Leo Tolstoy",)),
+        ]
+        config = BatchConfig(max_workers=2, chunk_size=1, stream_results=True)
+        batch = BatchMatcher(batch_config=config)
+        results = list(batch.link(left, right))
+        assert len(results) >= 1
+
+    def test_parallel_link_non_streaming(self):
+        """Parallel non-streaming link should find best per left book."""
+        left = [Book(title="The Great Gatsby", authors=("Fitzgerald",))]
+        right = [
+            Book(title="The Great Gatsby", authors=("Fitzgerald",)),
+            Book(title="Great Gatsby", authors=("Fitzgerald",)),
+        ]
+        config = BatchConfig(max_workers=2, chunk_size=1, stream_results=False)
+        batch = BatchMatcher(batch_config=config)
+        results = list(batch.link(left, right))
+        assert len(results) <= 1
+
+    def test_parallel_link_progress(self):
+        """Progress callback should work in parallel link."""
+        left = [Book(title="The Great Gatsby", authors=("Fitzgerald",))]
+        right = [
+            Book(title="The Great Gatsby", authors=("Fitzgerald",)),
+            Book(title="Great Gatsby", authors=("Fitzgerald",)),
+        ]
+        progress_calls: list[BatchProgress] = []
+        config = BatchConfig(max_workers=2, chunk_size=1, stream_results=True)
+        batch = BatchMatcher(batch_config=config)
+        list(batch.link(left, right, on_progress=progress_calls.append))
+        assert len(progress_calls) >= 1
+
+    def test_parallel_link_non_streaming_progress(self):
+        """Progress tracking in non-streaming parallel link — issue #39."""
+        left = [Book(title="The Great Gatsby", authors=("Fitzgerald",))]
+        right = [
+            Book(title="The Great Gatsby", authors=("Fitzgerald",)),
+            Book(title="Great Gatsby", authors=("Fitzgerald",)),
+        ]
+        progress_calls: list[BatchProgress] = []
+        config = BatchConfig(max_workers=2, chunk_size=1, stream_results=False)
+        batch = BatchMatcher(batch_config=config)
+        list(batch.link(left, right, on_progress=progress_calls.append))
+        assert len(progress_calls) >= 1
+        # Final progress should have completed > 0
+        final = progress_calls[-1]
+        assert final.completed > 0
+
+
 class TestFindMatches:
     def test_returns_sorted_results(self):
         book = Book(title="The Great Gatsby", authors=("Fitzgerald",))

@@ -100,8 +100,14 @@ def cmd_dedup(args: argparse.Namespace) -> None:
     try:
         with open(args.input) as f:
             raw_books = json.load(f)
-    except (json.JSONDecodeError, FileNotFoundError, OSError) as e:
-        print(f"Error: {e}", file=sys.stderr)
+    except FileNotFoundError:
+        print(f"Error: file not found: {args.input}", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: invalid JSON in {args.input}: {e.msg}", file=sys.stderr)
+        sys.exit(1)
+    except OSError:
+        print(f"Error: could not read file: {args.input}", file=sys.stderr)
         sys.exit(1)
 
     if not isinstance(raw_books, list):

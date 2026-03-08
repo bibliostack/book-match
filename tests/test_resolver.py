@@ -301,6 +301,231 @@ class TestResolveWithDiagnostics:
         assert statuses["failing"] == SourceStatus.ERROR
 
 
+class TestResolveBatch:
+    """Tests for resolve_batch() — issue #34."""
+
+    @pytest.mark.asyncio
+    async def test_resolve_batch_basic(self):
+        """Resolve multiple books concurrently."""
+        source = FakeSource(
+            books=[
+                Book(title="The Great Gatsby", authors=("Fitzgerald",), source="fake"),
+                Book(title="War and Peace", authors=("Tolstoy",), source="fake"),
+            ]
+        )
+        resolver = BookResolver(sources=[source])
+        books = [
+            Book(title="The Great Gatsby", authors=("Fitzgerald",)),
+            Book(title="War and Peace", authors=("Tolstoy",)),
+        ]
+        results = await resolver.resolve_batch(books, min_confidence=0.5)
+        assert isinstance(results, dict)
+        assert len(results) == 2
+        assert 0 in results
+        assert 1 in results
+        assert len(results[0]) >= 1
+        assert len(results[1]) >= 1
+
+    @pytest.mark.asyncio
+    async def test_resolve_batch_empty(self):
+        """Empty input returns empty dict."""
+        source = FakeSource()
+        resolver = BookResolver(sources=[source])
+        results = await resolver.resolve_batch([])
+        assert results == {}
+
+    @pytest.mark.asyncio
+    async def test_resolve_batch_progress(self):
+        """Progress callback is called."""
+        source = FakeSource(books=[Book(title="Test", authors=("Author",), source="fake")])
+        resolver = BookResolver(sources=[source])
+        books = [
+            Book(title="Test", authors=("Author",)),
+            Book(title="Test 2", authors=("Author 2",)),
+        ]
+        progress_calls: list[tuple[int, int]] = []
+        await resolver.resolve_batch(
+            books,
+            on_progress=lambda completed, total: progress_calls.append((completed, total)),
+        )
+        assert len(progress_calls) >= 1
+        # Last call should show all completed
+        assert progress_calls[-1][0] == 2
+        assert progress_calls[-1][1] == 2
+
+    @pytest.mark.asyncio
+    async def test_resolve_batch_max_results(self):
+        """max_results_per_book limits results."""
+        source = FakeSource(
+            books=[
+                Book(title="Test", authors=("Author",), source="fake"),
+                Book(title="Test 2", authors=("Author",), source="fake"),
+            ]
+        )
+        resolver = BookResolver(sources=[source])
+        books = [Book(title="Test", authors=("Author",))]
+        results = await resolver.resolve_batch(books, max_results_per_book=1)
+        assert len(results[0]) <= 1
+
+    @pytest.mark.asyncio
+    async def test_resolve_batch_concurrency(self):
+        """Concurrency parameter is respected (no errors with low concurrency)."""
+        source = FakeSource(books=[Book(title="Test", authors=("Author",), source="fake")])
+        resolver = BookResolver(sources=[source])
+        books = [Book(title="Test", authors=("Author",)) for _ in range(5)]
+        results = await resolver.resolve_batch(books, concurrency=2)
+        assert len(results) == 5
+
+    @pytest.mark.asyncio
+    async def test_resolve_batch_no_match(self):
+        """Books with no matches get empty lists."""
+        source = FakeSource(books=[])
+        resolver = BookResolver(sources=[source])
+        books = [Book(title="Nonexistent", authors=("Nobody",))]
+        results = await resolver.resolve_batch(books)
+        assert results[0] == []
+
+
+class TestAllSourcesStrategy:
+    """Tests for ALL_SOURCES strategy — issue #36."""
+
+    @pytest.mark.asyncio
+    async def test_all_sources_returns_best_per_source(self):
+        """ALL_SOURCES should return the best match from each source."""
+        source1 = FakeSource(
+            name="s1",
+            books=[
+                Book(title="Gatsby", authors=("Fitzgerald",), source="s1"),
+            ],
+        )
+        source2 = FakeSource(
+            name="s2",
+            books=[
+                Book(title="Gatsby", authors=("Fitzgerald",), source="s2"),
+            ],
+        )
+        resolver = BookResolver(
+            sources=[source1, source2],
+            strategy=ResolveStrategy.ALL_SOURCES,
+        )
+        book = Book(title="Gatsby", authors=("Fitzgerald",))
+        results = await resolver.resolve(book, min_confidence=0.3)
+        # Should get one result per source
+        sources_in_results = {r.remote_book.source for r in results}
+        assert "s1" in sources_in_results
+        assert "s2" in sources_in_results
+
+    @pytest.mark.asyncio
+    async def test_all_sources_one_source_no_results(self):
+        """ALL_SOURCES with one source having no matches."""
+        source1 = FakeSource(
+            name="s1",
+            books=[
+                Book(title="Gatsby", authors=("Fitzgerald",), source="s1"),
+            ],
+        )
+        source2 = FakeSource(name="s2", books=[])
+        resolver = BookResolver(
+            sources=[source1, source2],
+            strategy=ResolveStrategy.ALL_SOURCES,
+        )
+        book = Book(title="Gatsby", authors=("Fitzgerald",))
+        results = await resolver.resolve(book, min_confidence=0.3)
+        assert len(results) >= 1
+        assert all(r.remote_book.source == "s1" for r in results)
+
+    @pytest.mark.asyncio
+    async def test_all_sources_sorted_by_confidence(self):
+        """Results should be sorted by confidence."""
+        source1 = FakeSource(
+            name="s1",
+            books=[
+                Book(title="Gatsby", authors=("Fitzgerald",), source="s1"),
+            ],
+        )
+        source2 = FakeSource(
+            name="s2",
+            books=[
+                Book(title="The Great Gatsby", authors=("Fitzgerald",), source="s2"),
+            ],
+        )
+        resolver = BookResolver(
+            sources=[source1, source2],
+            strategy=ResolveStrategy.ALL_SOURCES,
+        )
+        book = Book(title="The Great Gatsby", authors=("F. Scott Fitzgerald",))
+        results = await resolver.resolve(book, min_confidence=0.3)
+        if len(results) >= 2:
+            assert results[0].confidence >= results[1].confidence
+
+    @pytest.mark.asyncio
+    async def test_all_sources_no_source_attr(self):
+        """Books without source attribute are excluded from ALL_SOURCES grouping."""
+        source = FakeSource(
+            name="s1",
+            books=[
+                # Book without source field
+                Book(title="Gatsby", authors=("Fitzgerald",)),
+            ],
+        )
+        resolver = BookResolver(
+            sources=[source],
+            strategy=ResolveStrategy.ALL_SOURCES,
+        )
+        book = Book(title="Gatsby", authors=("Fitzgerald",))
+        results = await resolver.resolve(book, min_confidence=0.3)
+        # Books without source are excluded from best_by_source
+        assert len(results) == 0
+
+    @pytest.mark.asyncio
+    async def test_all_sources_with_diagnostics(self):
+        """ALL_SOURCES should work with resolve_with_diagnostics too."""
+        source1 = FakeSource(
+            name="s1",
+            books=[
+                Book(title="Gatsby", authors=("Fitzgerald",), source="s1"),
+            ],
+        )
+        source2 = FakeSource(
+            name="s2",
+            books=[
+                Book(title="Gatsby", authors=("Fitzgerald",), source="s2"),
+            ],
+        )
+        resolver = BookResolver(
+            sources=[source1, source2],
+            strategy=ResolveStrategy.ALL_SOURCES,
+        )
+        book = Book(title="Gatsby", authors=("Fitzgerald",))
+        outcome = await resolver.resolve_with_diagnostics(book, min_confidence=0.3)
+        assert len(outcome.source_diagnostics) == 2
+        sources_in_results = {r.remote_book.source for r in outcome.results}
+        assert "s1" in sources_in_results
+        assert "s2" in sources_in_results
+
+
+class TestFirstConfidentFallback:
+    """Tests for FIRST_CONFIDENT returning empty when no confident match — issue #47."""
+
+    @pytest.mark.asyncio
+    async def test_first_confident_no_confident_returns_empty(self):
+        """When no auto-accept match, FIRST_CONFIDENT should return empty list."""
+        source = FakeSource(
+            books=[
+                # This will produce a low-confidence match, not auto_accept
+                Book(title="Different Book", authors=("Different Author",), source="fake"),
+            ]
+        )
+        resolver = BookResolver(
+            sources=[source],
+            strategy=ResolveStrategy.FIRST_CONFIDENT,
+        )
+        book = Book(title="The Great Gatsby", authors=("Fitzgerald",))
+        results = await resolver.resolve(book, min_confidence=0.1)
+        # No auto_accept match, so should return empty
+        assert results == []
+
+
 class TestClose:
     @pytest.mark.asyncio
     async def test_close_sources(self):

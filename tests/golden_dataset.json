@@ -14,8 +14,8 @@
     "remote": {"title": "1984", "authors": ["George Orwell"], "isbn_13": "9780141036144", "year": 2008, "language": "en"},
     "expected_verdict": null,
     "expected_kind": "same_work",
-    "min_confidence": 0.3,
-    "max_confidence": 0.9
+    "min_confidence": 0.35,
+    "max_confidence": 0.55
   },
   {
     "description": "Same work - subtitle variation",
@@ -59,7 +59,7 @@
     "remote": {"title": "The Road", "authors": ["Jack London"], "year": 1913, "language": "en"},
     "expected_verdict": null,
     "expected_kind": null,
-    "min_confidence": 0.0,
+    "min_confidence": 0.20,
     "max_confidence": 0.75
   },
   {
@@ -86,7 +86,7 @@
     "remote": {"title": "Cien años de soledad", "authors": ["Gabriel Garcia Marquez"], "language": "es", "year": 1967},
     "expected_verdict": null,
     "expected_kind": null,
-    "min_confidence": 0.0,
+    "min_confidence": 0.10,
     "max_confidence": 0.80
   },
   {
@@ -122,8 +122,8 @@
     "remote": {"title": "Textbook", "authors": ["Author A", "Author B"]},
     "expected_verdict": null,
     "expected_kind": null,
-    "min_confidence": 0.60,
-    "max_confidence": 1.0
+    "min_confidence": 0.70,
+    "max_confidence": 0.97
   },
   {
     "description": "Minimal metadata - title only",
@@ -131,8 +131,8 @@
     "remote": {"title": "Sapiens"},
     "expected_verdict": null,
     "expected_kind": null,
-    "min_confidence": 0.30,
-    "max_confidence": 0.97
+    "min_confidence": 0.40,
+    "max_confidence": 0.65
   },
   {
     "description": "Year close but not exact",
@@ -149,7 +149,7 @@
     "remote": {"title": "The Art of War", "authors": ["Sun Tzu"], "year": 2010},
     "expected_verdict": null,
     "expected_kind": null,
-    "min_confidence": 0.50,
+    "min_confidence": 0.65,
     "max_confidence": 0.97
   },
   {
@@ -275,7 +275,7 @@
     "remote": {"title": "Frankenstein", "authors": ["Mary Shelley"], "year": 2018, "language": "en"},
     "expected_verdict": null,
     "expected_kind": null,
-    "min_confidence": 0.60,
+    "min_confidence": 0.70,
     "max_confidence": 0.97
   },
   {
@@ -374,7 +374,7 @@
     "remote": {"title": "The Complete Works of Shakespeare", "authors": ["William Shakespeare", "Stephen Orgel", "A. R. Braunmuller"]},
     "expected_verdict": null,
     "expected_kind": null,
-    "min_confidence": 0.50,
+    "min_confidence": 0.60,
     "max_confidence": 0.97
   },
   {
@@ -401,7 +401,7 @@
     "remote": {"title": "Moby Dick", "authors": ["Herman Melville"], "year": 2000, "language": "en"},
     "expected_verdict": null,
     "expected_kind": null,
-    "min_confidence": 0.60,
+    "min_confidence": 0.70,
     "max_confidence": 0.97
   },
   {

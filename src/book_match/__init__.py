@@ -52,7 +52,7 @@ from book_match.batch import (
 )
 
 # Configuration
-from book_match.core.config import BatchConfig, MatchConfig
+from book_match.core.config import BatchConfig, MatchConfig, SourceConfig
 
 # Exceptions
 from book_match.core.exceptions import (
@@ -160,6 +160,7 @@ __all__ = [
     # Configuration
     "MatchConfig",
     "BatchConfig",
+    "SourceConfig",
     # Exceptions
     "BookMatchError",
     "ISBNError",
