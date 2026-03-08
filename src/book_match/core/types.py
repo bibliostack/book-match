@@ -15,6 +15,14 @@ class SourceStatus(Enum):
     ERROR = "error"
 
 
+class MatchKind(Enum):
+    """Classification of what kind of match was found."""
+
+    SAME_EDITION = "same_edition"  # Same ISBN, same publisher/year — identical edition
+    SAME_WORK = "same_work"  # Same title/author but different edition
+    UNCERTAIN = "uncertain"  # Insufficient data to classify
+
+
 class MatchVerdict(Enum):
     """Verdict for a match result."""
 
@@ -101,6 +109,7 @@ class MatchResult:
     explanation: str  # human-readable summary
     local_book: Book
     remote_book: Book
+    kind: MatchKind = MatchKind.UNCERTAIN
 
     @property
     def should_auto_accept(self) -> bool:
@@ -165,6 +174,12 @@ def _factor_to_reason_code(factor: MatchFactor) -> str | None:
             return "YEAR_MISMATCH"
     elif name == "publisher":
         return "PUBLISHER_MATCH" if sim >= 0.80 else "PUBLISHER_WEAK"
+    elif name == "series":
+        if sim >= 1.0:
+            return "SERIES_MATCH"
+        elif sim <= 0.0:
+            return "SERIES_MISMATCH"
+        return None
     return None
 
 

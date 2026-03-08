@@ -62,6 +62,40 @@ _SERIES_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# Pattern for extracting series info (volume/book number)
+_SERIES_EXTRACT_PATTERN = re.compile(
+    r"(?:"
+    r"[\(\[]\s*(?:book|vol(?:ume)?\.?|part|#)\s*(\d+)[^\)\]]*[\)\]]|"  # (Book 1), [Vol. 2]
+    r"(?:book|volume|vol\.?|part)\s+(\d+)|"  # Book 1, Volume 2
+    r"#(\d+)"  # #3
+    r")",
+    re.IGNORECASE,
+)
+
+
+def extract_series_info(title: str | None) -> tuple[str | None, int | None]:
+    """Extract series/volume information from a title.
+
+    Returns:
+        Tuple of (title_without_series, volume_number).
+        Both are None if no series info found.
+    """
+    if not title:
+        return None, None
+
+    match = _SERIES_EXTRACT_PATTERN.search(title)
+    if not match:
+        return None, None
+
+    # Get volume number from whichever group matched
+    volume = next((int(g) for g in match.groups() if g is not None), None)
+
+    # Strip series markers to get clean title
+    clean_title = strip_series_markers(title)
+
+    return clean_title, volume
+
+
 # Article prefixes that can be moved/removed
 _ARTICLE_PATTERN = re.compile(
     r"^(the|a|an|el|la|le|les|das|der|die|ein|eine)\s+",

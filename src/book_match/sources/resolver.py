@@ -59,6 +59,7 @@ class BookResolver:
         matcher: BookMatcher | None = None,
         match_config: MatchConfig | None = None,
         strategy: ResolveStrategy = ResolveStrategy.BEST_MATCH,
+        min_agreeing_sources: int = 2,
     ):
         """Initialize the resolver.
 
@@ -67,6 +68,7 @@ class BookResolver:
             matcher: BookMatcher instance (created with match_config if not provided)
             match_config: Configuration for matching (ignored if matcher provided)
             strategy: Resolution strategy
+            min_agreeing_sources: Minimum sources that must agree for CONSENSUS strategy
         """
         if not sources:
             raise ValueError("At least one metadata source is required")
@@ -74,6 +76,7 @@ class BookResolver:
         self.sources = list(sources)
         self.matcher = matcher or BookMatcher(match_config)
         self.strategy = strategy
+        self.min_agreeing_sources = min_agreeing_sources
 
     async def _query_source(
         self,
@@ -155,12 +158,53 @@ class BookResolver:
             )
 
         elif self.strategy == ResolveStrategy.CONSENSUS:
-            raise NotImplementedError(
-                "CONSENSUS strategy is not yet implemented. "
-                "Use BEST_MATCH, FIRST_CONFIDENT, or ALL_SOURCES instead."
-            )
+            results = self._apply_consensus(results, all_candidates)
 
         return results[:max_results]
+
+    def _apply_consensus(
+        self,
+        results: list[MatchResult],
+        all_candidates: list[Book],
+    ) -> list[MatchResult]:
+        """Filter results to only those confirmed by multiple sources.
+
+        Groups candidates by identity (using BookMatcher cross-comparison),
+        then keeps only groups that have candidates from at least
+        ``min_agreeing_sources`` distinct sources. Falls back to BEST_MATCH
+        behavior if fewer than 2 sources returned results.
+        """
+        # Determine how many distinct sources returned results
+        sources_with_results = {c.source for c in all_candidates if c.source}
+        if len(sources_with_results) < 2:
+            # Not enough sources to apply consensus — fall back to BEST_MATCH
+            return results
+
+        # Group candidates by identity using quick_score.
+        # Each group collects candidates that match each other.
+        groups: list[list[Book]] = []
+        for candidate in all_candidates:
+            placed = False
+            for group in groups:
+                score = self.matcher.quick_score(group[0], candidate)
+                if score >= 0.80:
+                    group.append(candidate)
+                    placed = True
+                    break
+            if not placed:
+                groups.append([candidate])
+
+        # Find candidates that appear in enough distinct sources
+        consensus_candidates: set[int] = set()
+        for group in groups:
+            distinct_sources = {b.source for b in group if b.source}
+            if len(distinct_sources) >= self.min_agreeing_sources:
+                for b in group:
+                    consensus_candidates.add(id(b))
+
+        # Filter results to only consensus candidates
+        filtered = [r for r in results if id(r.remote_book) in consensus_candidates]
+        return filtered
 
     async def _query_source_with_diagnostic(
         self,

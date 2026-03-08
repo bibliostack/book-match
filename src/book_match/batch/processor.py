@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
 from book_match.batch.blocking import DEFAULT_DEDUP_RULES, DEFAULT_LINK_RULES, BlockingRule
@@ -85,7 +86,8 @@ class BatchMatcher:
     ) -> Iterator[MatchResult]:
         """Find duplicate books within a dataset.
 
-        Uses blocking to avoid O(n²) comparisons.
+        Uses blocking to avoid O(n²) comparisons. When ``max_workers > 1``,
+        blocks are compared in parallel using a thread pool.
 
         Args:
             books: Books to deduplicate
@@ -100,43 +102,39 @@ class BatchMatcher:
         # Generate blocks
         blocks = self._generate_blocks(books, rules)
 
-        # Track which pairs we've already compared
-        compared: set[tuple[int, int]] = set()
+        # Collect unique pairs across all blocks
+        all_pairs: list[tuple[int, int]] = []
+        seen: set[tuple[int, int]] = set()
 
-        # Count total comparisons needed
-        total_comparisons = sum(
-            len(indices) * (len(indices) - 1) // 2 for indices in blocks.values()
-        )
+        for _block_key, indices in blocks.items():
+            for i, idx1 in enumerate(indices):
+                for idx2 in indices[i + 1 :]:
+                    pair = (min(idx1, idx2), max(idx1, idx2))
+                    if pair not in seen:
+                        seen.add(pair)
+                        all_pairs.append(pair)
 
+        total_comparisons = len(all_pairs)
         start_time = time.time()
         completed = 0
         matches_found = 0
 
-        # Compare within each block
-        for _block_key, indices in blocks.items():
-            for i, idx1 in enumerate(indices):
-                for idx2 in indices[i + 1 :]:
-                    # Ensure consistent ordering
-                    pair = (min(idx1, idx2), max(idx1, idx2))
-                    if pair in compared:
-                        continue
-                    compared.add(pair)
+        if self.config.max_workers > 1 and total_comparisons > 0:
+            # Parallel: process chunks of pairs via thread pool
+            chunk_size = max(1, self.config.chunk_size)
+            chunks = [all_pairs[i : i + chunk_size] for i in range(0, len(all_pairs), chunk_size)]
 
-                    # Compare
-                    book1 = books[idx1]
-                    book2 = books[idx2]
+            with ThreadPoolExecutor(max_workers=self.config.max_workers) as executor:
+                futures = [executor.submit(self._compare_pairs, books, chunk) for chunk in chunks]
 
-                    score = self.matcher.quick_score(book1, book2)
-                    if score >= self.config.min_confidence:
-                        result = self.matcher.match(book1, book2)
-                        if result.confidence >= self.config.min_confidence:
-                            matches_found += 1
-                            yield result
+                for future in futures:
+                    chunk_results = future.result()
+                    completed += len(chunks[futures.index(future)])
+                    for result in chunk_results:
+                        matches_found += 1
+                        yield result
 
-                    completed += 1
-
-                    # Progress callback
-                    if on_progress and completed % 100 == 0:
+                    if on_progress:
                         elapsed = time.time() - start_time
                         on_progress(
                             BatchProgress(
@@ -146,6 +144,31 @@ class BatchMatcher:
                                 elapsed_seconds=elapsed,
                             )
                         )
+        else:
+            # Single-threaded path
+            for idx1, idx2 in all_pairs:
+                book1 = books[idx1]
+                book2 = books[idx2]
+
+                score = self.matcher.quick_score(book1, book2)
+                if score >= self.config.min_confidence:
+                    result = self.matcher.match(book1, book2)
+                    if result.confidence >= self.config.min_confidence:
+                        matches_found += 1
+                        yield result
+
+                completed += 1
+
+                if on_progress and completed % 100 == 0:
+                    elapsed = time.time() - start_time
+                    on_progress(
+                        BatchProgress(
+                            total=total_comparisons,
+                            completed=completed,
+                            matches_found=matches_found,
+                            elapsed_seconds=elapsed,
+                        )
+                    )
 
         # Final progress
         if on_progress:
@@ -159,6 +182,21 @@ class BatchMatcher:
                 )
             )
 
+    def _compare_pairs(
+        self,
+        books: Sequence[Book],
+        pairs: list[tuple[int, int]],
+    ) -> list[MatchResult]:
+        """Compare a batch of book pairs. Used for parallel execution."""
+        results: list[MatchResult] = []
+        for idx1, idx2 in pairs:
+            score = self.matcher.quick_score(books[idx1], books[idx2])
+            if score >= self.config.min_confidence:
+                result = self.matcher.match(books[idx1], books[idx2])
+                if result.confidence >= self.config.min_confidence:
+                    results.append(result)
+        return results
+
     def link(
         self,
         left: Sequence[Book],
@@ -169,6 +207,7 @@ class BatchMatcher:
         """Link books between two datasets.
 
         Finds matches between books in `left` and books in `right`.
+        When ``max_workers > 1``, comparisons run in parallel.
 
         Args:
             left: Source dataset (local books)
@@ -188,47 +227,41 @@ class BatchMatcher:
         # Find overlapping blocks
         overlapping_keys = set(left_blocks.keys()) & set(right_blocks.keys())
 
-        # Count total comparisons
-        total_comparisons = sum(
-            len(left_blocks[key]) * len(right_blocks[key]) for key in overlapping_keys
-        )
+        # Collect unique cross-dataset pairs
+        all_pairs: list[tuple[int, int]] = []
+        seen: set[tuple[int, int]] = set()
+        for block_key in overlapping_keys:
+            for left_idx in left_blocks[block_key]:
+                for right_idx in right_blocks[block_key]:
+                    pair = (left_idx, right_idx)
+                    if pair not in seen:
+                        seen.add(pair)
+                        all_pairs.append(pair)
 
+        total_comparisons = len(all_pairs)
         start_time = time.time()
         completed = 0
 
-        # Track best match for each left book
-        best_matches: dict[int, MatchResult] = {}
-
         if self.config.stream_results:
-            # Streaming mode: yield matches immediately as found
-            yielded_pairs: set[tuple[int, int]] = set()
             matches_found = 0
 
-            for block_key in overlapping_keys:
-                left_indices = left_blocks[block_key]
-                right_indices = right_blocks[block_key]
-
-                for left_idx in left_indices:
-                    for right_idx in right_indices:
-                        pair = (left_idx, right_idx)
-                        if pair in yielded_pairs:
-                            completed += 1
-                            continue
-
-                        left_book = left[left_idx]
-                        right_book = right[right_idx]
-
-                        score = self.matcher.quick_score(left_book, right_book)
-                        if score >= self.config.min_confidence:
-                            result = self.matcher.match(left_book, right_book)
-                            if result.confidence >= self.config.min_confidence:
-                                yielded_pairs.add(pair)
-                                matches_found += 1
-                                yield result
-
-                        completed += 1
-
-                        if on_progress and completed % 100 == 0:
+            if self.config.max_workers > 1 and total_comparisons > 0:
+                chunk_size = max(1, self.config.chunk_size)
+                chunks = [
+                    all_pairs[i : i + chunk_size] for i in range(0, len(all_pairs), chunk_size)
+                ]
+                with ThreadPoolExecutor(max_workers=self.config.max_workers) as executor:
+                    futures = [
+                        executor.submit(self._compare_link_pairs, left, right, chunk)
+                        for chunk in chunks
+                    ]
+                    for future in futures:
+                        chunk_results = future.result()
+                        completed += len(chunks[futures.index(future)])
+                        for result in chunk_results:
+                            matches_found += 1
+                            yield result
+                        if on_progress:
                             elapsed = time.time() - start_time
                             on_progress(
                                 BatchProgress(
@@ -238,6 +271,30 @@ class BatchMatcher:
                                     elapsed_seconds=elapsed,
                                 )
                             )
+            else:
+                for left_idx, right_idx in all_pairs:
+                    left_book = left[left_idx]
+                    right_book = right[right_idx]
+
+                    score = self.matcher.quick_score(left_book, right_book)
+                    if score >= self.config.min_confidence:
+                        result = self.matcher.match(left_book, right_book)
+                        if result.confidence >= self.config.min_confidence:
+                            matches_found += 1
+                            yield result
+
+                    completed += 1
+
+                    if on_progress and completed % 100 == 0:
+                        elapsed = time.time() - start_time
+                        on_progress(
+                            BatchProgress(
+                                total=total_comparisons,
+                                completed=completed,
+                                matches_found=matches_found,
+                                elapsed_seconds=elapsed,
+                            )
+                        )
 
             if on_progress:
                 elapsed = time.time() - start_time
@@ -251,37 +308,58 @@ class BatchMatcher:
                 )
         else:
             # Non-streaming mode: collect best match per left book, then yield sorted
-            for block_key in overlapping_keys:
-                left_indices = left_blocks[block_key]
-                right_indices = right_blocks[block_key]
+            best_matches: dict[int, MatchResult] = {}
 
-                for left_idx in left_indices:
-                    for right_idx in right_indices:
-                        left_book = left[left_idx]
-                        right_book = right[right_idx]
-
-                        score = self.matcher.quick_score(left_book, right_book)
-                        if score >= self.config.min_confidence:
-                            result = self.matcher.match(left_book, right_book)
-
-                            if result.confidence >= self.config.min_confidence:
+            if self.config.max_workers > 1 and total_comparisons > 0:
+                chunk_size = max(1, self.config.chunk_size)
+                chunks = [
+                    all_pairs[i : i + chunk_size] for i in range(0, len(all_pairs), chunk_size)
+                ]
+                with ThreadPoolExecutor(max_workers=self.config.max_workers) as executor:
+                    futures = [
+                        executor.submit(self._compare_link_pairs, left, right, chunk)
+                        for chunk in chunks
+                    ]
+                    for future in futures:
+                        chunk_results = future.result()
+                        for result in chunk_results:
+                            # Find left_idx by matching local_book
+                            found_idx: int | None = next(
+                                (i for i, b in enumerate(left) if b is result.local_book),
+                                None,
+                            )
+                            if found_idx is not None:
+                                left_idx = found_idx
                                 if left_idx not in best_matches:
                                     best_matches[left_idx] = result
                                 elif result.confidence > best_matches[left_idx].confidence:
                                     best_matches[left_idx] = result
+            else:
+                for left_idx, right_idx in all_pairs:
+                    left_book = left[left_idx]
+                    right_book = right[right_idx]
 
-                        completed += 1
+                    score = self.matcher.quick_score(left_book, right_book)
+                    if score >= self.config.min_confidence:
+                        result = self.matcher.match(left_book, right_book)
+                        if result.confidence >= self.config.min_confidence:
+                            if left_idx not in best_matches:
+                                best_matches[left_idx] = result
+                            elif result.confidence > best_matches[left_idx].confidence:
+                                best_matches[left_idx] = result
 
-                        if on_progress and completed % 100 == 0:
-                            elapsed = time.time() - start_time
-                            on_progress(
-                                BatchProgress(
-                                    total=total_comparisons,
-                                    completed=completed,
-                                    matches_found=len(best_matches),
-                                    elapsed_seconds=elapsed,
-                                )
+                    completed += 1
+
+                    if on_progress and completed % 100 == 0:
+                        elapsed = time.time() - start_time
+                        on_progress(
+                            BatchProgress(
+                                total=total_comparisons,
+                                completed=completed,
+                                matches_found=len(best_matches),
+                                elapsed_seconds=elapsed,
                             )
+                        )
 
             sorted_matches = sorted(
                 best_matches.values(),
@@ -302,6 +380,22 @@ class BatchMatcher:
                         elapsed_seconds=elapsed,
                     )
                 )
+
+    def _compare_link_pairs(
+        self,
+        left: Sequence[Book],
+        right: Sequence[Book],
+        pairs: list[tuple[int, int]],
+    ) -> list[MatchResult]:
+        """Compare a batch of cross-dataset pairs. Used for parallel link()."""
+        results: list[MatchResult] = []
+        for left_idx, right_idx in pairs:
+            score = self.matcher.quick_score(left[left_idx], right[right_idx])
+            if score >= self.config.min_confidence:
+                result = self.matcher.match(left[left_idx], right[right_idx])
+                if result.confidence >= self.config.min_confidence:
+                    results.append(result)
+        return results
 
     def find_matches(
         self,

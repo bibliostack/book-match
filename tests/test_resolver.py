@@ -125,7 +125,8 @@ class TestStrategies:
         assert len(results) >= 1
 
     @pytest.mark.asyncio
-    async def test_consensus_raises(self):
+    async def test_consensus_with_agreement(self):
+        """Two sources returning the same book should pass consensus."""
         source1 = FakeSource(
             name="s1",
             books=[
@@ -143,8 +144,51 @@ class TestStrategies:
             strategy=ResolveStrategy.CONSENSUS,
         )
         book = Book(title="Gatsby", authors=("Fitzgerald",))
-        with pytest.raises(NotImplementedError):
-            await resolver.resolve(book)
+        results = await resolver.resolve(book, min_confidence=0.5)
+        assert len(results) >= 1
+
+    @pytest.mark.asyncio
+    async def test_consensus_without_agreement(self):
+        """Only one source returning a book should be filtered out."""
+        source1 = FakeSource(
+            name="s1",
+            books=[
+                Book(title="Gatsby", authors=("Fitzgerald",), source="s1"),
+            ],
+        )
+        source2 = FakeSource(
+            name="s2",
+            books=[
+                Book(title="War and Peace", authors=("Tolstoy",), source="s2"),
+            ],
+        )
+        resolver = BookResolver(
+            sources=[source1, source2],
+            strategy=ResolveStrategy.CONSENSUS,
+        )
+        book = Book(title="Gatsby", authors=("Fitzgerald",))
+        results = await resolver.resolve(book, min_confidence=0.3)
+        # Neither book appears in both sources, so consensus filters all
+        assert len(results) == 0
+
+    @pytest.mark.asyncio
+    async def test_consensus_fallback_single_source(self):
+        """Falls back to BEST_MATCH when only one source returns results."""
+        source1 = FakeSource(
+            name="s1",
+            books=[
+                Book(title="Gatsby", authors=("Fitzgerald",), source="s1"),
+            ],
+        )
+        source2 = FakeSource(name="s2", books=[])
+        resolver = BookResolver(
+            sources=[source1, source2],
+            strategy=ResolveStrategy.CONSENSUS,
+        )
+        book = Book(title="Gatsby", authors=("Fitzgerald",))
+        results = await resolver.resolve(book, min_confidence=0.5)
+        # Should fall back to BEST_MATCH since only 1 source has results
+        assert len(results) >= 1
 
 
 class FailingSource(BaseSource):

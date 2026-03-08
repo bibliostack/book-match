@@ -6,10 +6,11 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from book_match.core.config import MatchConfig
-from book_match.core.types import Book, MatchFactor, MatchResult, MatchVerdict
+from book_match.core.types import Book, MatchFactor, MatchKind, MatchResult, MatchVerdict
 from book_match.isbn.compare import isbn_match_score
 from book_match.matching.explainer import generate_explanation
 from book_match.matching.normalizers import (
+    extract_series_info,
     normalize_author_list,
     normalize_authors,
     normalize_language,
@@ -356,6 +357,55 @@ class BookMatcher:
             matched_values=(local_publisher, remote_publisher),
         )
 
+    def _compare_series(
+        self,
+        local_title: str | None,
+        remote_title: str | None,
+    ) -> MatchFactor | None:
+        """Compare series/volume info extracted from titles.
+
+        Returns None if neither title has series info.
+        Same series + same volume = bonus, same series + different volume = penalty.
+        """
+        _, local_vol = extract_series_info(local_title)
+        _, remote_vol = extract_series_info(remote_title)
+
+        if local_vol is None and remote_vol is None:
+            return None
+
+        if local_vol is None or remote_vol is None:
+            # One has series info, other doesn't — slight mismatch signal
+            return MatchFactor(
+                name="series",
+                similarity=0.5,
+                weight=0.0,  # Adjustment factor, not a weighted component
+                contribution=0.0,
+                details="Series info present in only one book",
+                matched_values=(
+                    f"vol.{local_vol}" if local_vol is not None else None,
+                    f"vol.{remote_vol}" if remote_vol is not None else None,
+                ),
+            )
+
+        if local_vol == remote_vol:
+            return MatchFactor(
+                name="series",
+                similarity=1.0,
+                weight=0.0,
+                contribution=0.0,
+                details=f"Same volume ({local_vol})",
+                matched_values=(f"vol.{local_vol}", f"vol.{remote_vol}"),
+            )
+        else:
+            return MatchFactor(
+                name="series",
+                similarity=0.0,
+                weight=0.0,
+                contribution=0.0,
+                details=f"Different volumes ({local_vol} vs {remote_vol})",
+                matched_values=(f"vol.{local_vol}", f"vol.{remote_vol}"),
+            )
+
     def _compare_isbns(
         self,
         local_book: Book,
@@ -425,6 +475,7 @@ class BookMatcher:
                     ),
                     local_book=local,
                     remote_book=remote,
+                    kind=self._classify_kind(local, remote, factors),
                 )
 
             elif isbn_factor.similarity == 0.0:
@@ -450,6 +501,7 @@ class BookMatcher:
                     ),
                     local_book=local,
                     remote_book=remote,
+                    kind=self._classify_kind(local, remote, factors),
                 )
 
         # No ISBN comparison possible, use other factors
@@ -465,8 +517,22 @@ class BookMatcher:
             publisher_factor = self._compare_publishers(local.publisher, remote.publisher)
             factors.append(publisher_factor)
 
+        # Series/volume factor (informational — adjusts confidence, not weighted)
+        series_factor = self._compare_series(local.title, remote.title)
+        if series_factor is not None:
+            factors.append(series_factor)
+
         # Calculate confidence
         confidence = sum(f.contribution for f in factors)
+
+        # Apply series adjustment: different volumes penalize, same volumes bonus
+        if series_factor is not None:
+            if series_factor.similarity == 0.0:
+                # Different volumes of same series — significant penalty
+                confidence *= 0.7
+            elif series_factor.similarity == 1.0:
+                # Same volume — small bonus (capped later)
+                confidence *= 1.05
 
         # Cap at max non-ISBN confidence
         confidence = min(confidence, self.config.max_non_isbn_confidence)
@@ -481,7 +547,57 @@ class BookMatcher:
             explanation=generate_explanation(confidence, verdict, tuple(factors), local, remote),
             local_book=local,
             remote_book=remote,
+            kind=self._classify_kind(local, remote, factors),
         )
+
+    def _classify_kind(self, local: Book, remote: Book, factors: list[MatchFactor]) -> MatchKind:
+        """Classify match as same edition, same work, or uncertain."""
+        isbn_factor = next((f for f in factors if f.name == "isbn"), None)
+
+        if isbn_factor and isbn_factor.similarity == 1.0:
+            return MatchKind.SAME_EDITION
+
+        if isbn_factor and isbn_factor.similarity == 0.0:
+            # Both have ISBNs but they differ — different editions of same work
+            title_factor = next((f for f in factors if f.name == "title"), None)
+            author_factor = next((f for f in factors if f.name == "author"), None)
+            if (
+                title_factor
+                and author_factor
+                and title_factor.similarity >= 0.80
+                and author_factor.similarity >= 0.70
+            ):
+                return MatchKind.SAME_WORK
+            return MatchKind.UNCERTAIN
+
+        # No ISBN comparison — infer from other signals
+        title_factor = next((f for f in factors if f.name == "title"), None)
+        author_factor = next((f for f in factors if f.name == "author"), None)
+
+        if not title_factor or not author_factor:
+            return MatchKind.UNCERTAIN
+
+        if title_factor.similarity < 0.80 or author_factor.similarity < 0.70:
+            return MatchKind.UNCERTAIN
+
+        # High title+author match — check year/publisher for edition detection
+        same_year = False
+        same_publisher = False
+
+        year_factor = next((f for f in factors if f.name == "year"), None)
+        pub_factor = next((f for f in factors if f.name == "publisher"), None)
+
+        if year_factor and year_factor.similarity >= 1.0:
+            same_year = True
+        if pub_factor and pub_factor.similarity >= 0.80:
+            same_publisher = True
+
+        if same_year and same_publisher:
+            return MatchKind.SAME_EDITION
+        elif same_year or same_publisher:
+            return MatchKind.SAME_WORK
+
+        return MatchKind.SAME_WORK
 
     def _determine_verdict(self, confidence: float) -> MatchVerdict:
         """Determine the match verdict based on confidence."""

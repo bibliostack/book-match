@@ -1,7 +1,7 @@
 """Tests for the core matching engine."""
 
 from book_match.core.config import MatchConfig
-from book_match.core.types import Book, MatchVerdict
+from book_match.core.types import Book, MatchKind, MatchVerdict
 from book_match.matching.engine import BookMatcher
 
 
@@ -166,6 +166,52 @@ class TestQuickScore:
         assert score > 0.7
 
 
+class TestEdgeCases:
+    """Issue #16: Edge case tests for matching engine."""
+
+    def test_year_zero_not_missing(self, matcher):
+        local = Book(title="Test", authors=("Author",), year=0)
+        remote = Book(title="Test", authors=("Author",), year=0)
+        result = matcher.match(local, remote)
+        year_factor = result.get_factor("year")
+        assert year_factor is not None
+        assert year_factor.similarity == 1.0
+        assert year_factor.details != "Year information incomplete"
+
+    def test_empty_string_title_vs_none(self, matcher):
+        local_empty = Book(title="", authors=("Author",))
+        local_none = Book(title=None, authors=("Author",))
+        remote = Book(title="A Book", authors=("Author",))
+        result_empty = matcher.match(local_empty, remote)
+        result_none = matcher.match(local_none, remote)
+        # Both should be treated as missing
+        empty_factor = result_empty.get_factor("title")
+        none_factor = result_none.get_factor("title")
+        assert empty_factor is not None
+        assert none_factor is not None
+        assert empty_factor.similarity == none_factor.similarity
+
+    def test_single_char_title(self, matcher):
+        local = Book(title="X", authors=("Author",))
+        remote = Book(title="X", authors=("Author",))
+        result = matcher.match(local, remote)
+        assert result.confidence > 0.5
+
+    def test_all_none_fields(self, matcher):
+        local = Book()
+        remote = Book()
+        result = matcher.match(local, remote)
+        # Should not raise, should produce some result
+        assert result.confidence >= 0.0
+
+    def test_isbn_all_hyphens(self, matcher):
+        """ISBN that is only hyphens/spaces should not cause errors."""
+        local = Book(title="Test", authors=("Author",), isbn_13="---")
+        remote = Book(title="Test", authors=("Author",), isbn_13="9780743273565")
+        result = matcher.match(local, remote)
+        assert result.confidence >= 0.0
+
+
 class TestPublisherScoring:
     def test_publisher_default_weight_no_effect(self, matcher):
         """Default publisher_weight=0.0 means no publisher factor in results."""
@@ -223,6 +269,34 @@ class TestPublisherScoring:
         assert pub_factor.similarity == 0.5
 
 
+class TestMatchKind:
+    def test_isbn_match_is_same_edition(self, matcher, gatsby_local, gatsby_remote):
+        result = matcher.match(gatsby_local, gatsby_remote)
+        assert result.kind == MatchKind.SAME_EDITION
+
+    def test_isbn_mismatch_high_title_is_same_work(self, matcher):
+        local = Book(
+            title="The Great Gatsby", authors=("F. Scott Fitzgerald",), isbn_13="9780306406157"
+        )
+        remote = Book(
+            title="The Great Gatsby", authors=("F. Scott Fitzgerald",), isbn_13="9780743273565"
+        )
+        result = matcher.match(local, remote)
+        assert result.kind == MatchKind.SAME_WORK
+
+    def test_no_isbn_different_books_uncertain(self, matcher):
+        local = Book(title="The Great Gatsby", authors=("Fitzgerald",))
+        remote = Book(title="War and Peace", authors=("Tolstoy",))
+        result = matcher.match(local, remote)
+        assert result.kind == MatchKind.UNCERTAIN
+
+    def test_default_kind_is_uncertain(self, matcher):
+        local = Book()
+        remote = Book()
+        result = matcher.match(local, remote)
+        assert result.kind == MatchKind.UNCERTAIN
+
+
 class TestReasonCodes:
     def test_isbn_match_reason(self, matcher, gatsby_local, gatsby_remote):
         result = matcher.match(gatsby_local, gatsby_remote)
@@ -272,3 +346,42 @@ class TestExplanation:
         result = matcher.match(gatsby_local, gatsby_remote)
         for factor in result.factors:
             assert len(factor.details) > 0
+
+
+class TestSeriesScoring:
+    def test_same_volume_no_penalty(self, matcher):
+        local = Book(title="Harry Potter (Book 1)", authors=("Rowling",))
+        remote = Book(title="Harry Potter (Book 1)", authors=("Rowling",))
+        result = matcher.match(local, remote)
+        series_factor = result.get_factor("series")
+        assert series_factor is not None
+        assert series_factor.similarity == 1.0
+
+    def test_different_volume_penalizes(self, matcher):
+        local = Book(title="Harry Potter (Book 1)", authors=("Rowling",))
+        remote = Book(title="Harry Potter (Book 2)", authors=("Rowling",))
+        result = matcher.match(local, remote)
+        series_factor = result.get_factor("series")
+        assert series_factor is not None
+        assert series_factor.similarity == 0.0
+        # Confidence should be lower than same volume
+        same = matcher.match(
+            Book(title="Harry Potter (Book 1)", authors=("Rowling",)),
+            Book(title="Harry Potter (Book 1)", authors=("Rowling",)),
+        )
+        assert result.confidence < same.confidence
+
+    def test_no_series_no_factor(self, matcher):
+        local = Book(title="The Great Gatsby", authors=("Fitzgerald",))
+        remote = Book(title="The Great Gatsby", authors=("Fitzgerald",))
+        result = matcher.match(local, remote)
+        assert result.get_factor("series") is None
+
+    def test_volume_format_variations(self, matcher):
+        """Vol. 2 vs Volume 2 should both extract volume 2."""
+        local = Book(title="Encyclopedia Vol. 2", authors=("Editor",))
+        remote = Book(title="Encyclopedia Volume 2", authors=("Editor",))
+        result = matcher.match(local, remote)
+        series_factor = result.get_factor("series")
+        assert series_factor is not None
+        assert series_factor.similarity == 1.0

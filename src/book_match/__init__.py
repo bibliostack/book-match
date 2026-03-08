@@ -69,6 +69,7 @@ from book_match.core.types import (
     BatchProgress,
     Book,
     MatchFactor,
+    MatchKind,
     MatchResult,
     MatchVerdict,
     ResolveOutcome,
@@ -96,6 +97,7 @@ from book_match.matching.engine import BookMatcher
 
 # Normalizers
 from book_match.matching.normalizers import (
+    extract_series_info,
     normalize_author,
     normalize_author_list,
     normalize_authors,
@@ -147,6 +149,7 @@ __all__ = [
     # Core types
     "Book",
     "MatchFactor",
+    "MatchKind",
     "MatchResult",
     "MatchVerdict",
     "SearchQuery",
@@ -189,6 +192,7 @@ __all__ = [
     "normalize_publisher",
     "strip_subtitle",
     "strip_series_markers",
+    "extract_series_info",
     # Similarity
     "jaro_similarity",
     "jaro_winkler_similarity",
