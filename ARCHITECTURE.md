@@ -36,7 +36,8 @@ book_match/
 ├── isbn/                    # ISBN handling
 │   ├── validate.py          # Checksum validation (ISBN-10, ISBN-13)
 │   ├── convert.py           # ISBN-10 ↔ ISBN-13 conversion
-│   └── normalize.py         # Cleaning and normalization
+│   ├── normalize.py         # Cleaning and normalization
+│   └── compare.py           # Format-agnostic ISBN comparison
 │
 ├── sources/                 # Metadata source abstraction
 │   ├── base.py              # MetadataSource protocol
@@ -93,6 +94,12 @@ class MatchVerdict(Enum):
     AUTO_ACCEPT = "auto_accept"  # High confidence, apply automatically
     REVIEW = "review"            # Medium confidence, human review needed
     REJECT = "reject"            # Low confidence, likely not a match
+
+
+class MatchKind(Enum):
+    SAME_EDITION = "same_edition"  # Same book, same edition
+    SAME_WORK = "same_work"        # Same book, different edition
+    UNCERTAIN = "uncertain"        # Cannot determine edition relationship
 ```
 
 ## Matching Engine
@@ -183,26 +190,37 @@ For matching within a single dataset (deduplication) or between two datasets:
 class BatchMatcher:
     def __init__(
         self,
-        matcher: BookMatcher,
+        matcher: BookMatcher | None = None,
+        match_config: MatchConfig | None = None,
+        batch_config: BatchConfig | None = None,
         blocking_rules: Sequence[BlockingRule] | None = None,
-        config: BatchConfig | None = None,
     ):
         ...
-    
+
     def deduplicate(
         self,
         books: Sequence[Book],
-        on_progress: ProgressCallback | None = None,
+        blocking_rules: Sequence[BlockingRule] | None = None,
+        on_progress: Callable[[BatchProgress], None] | None = None,
     ) -> Iterator[MatchResult]:
         """Find duplicate books within a dataset."""
-        
+
     def link(
         self,
         left: Sequence[Book],
         right: Sequence[Book],
-        on_progress: ProgressCallback | None = None,
+        blocking_rules: Sequence[BlockingRule] | None = None,
+        on_progress: Callable[[BatchProgress], None] | None = None,
     ) -> Iterator[MatchResult]:
         """Link books between two datasets."""
+
+    def find_matches(
+        self,
+        book: Book,
+        candidates: Sequence[Book],
+        max_results: int | None = None,
+    ) -> list[MatchResult]:
+        """Match a single book against a list of candidates."""
 ```
 
 Blocking rules reduce the comparison space:
@@ -216,10 +234,13 @@ class BlockingRule(Protocol):
         ...
 
 # Built-in rules
-class FirstAuthorSurname(BlockingRule): ...
-class TitlePrefix(BlockingRule): ...
-class ISBN13Prefix(BlockingRule): ...
-class YearRange(BlockingRule): ...
+class TitlePrefix(BlockingRule): ...       # Group by first N chars of title
+class TitleFirstWord(BlockingRule): ...    # Group by first significant word
+class FirstAuthorSurname(BlockingRule): ...# Group by author surname
+class ISBN13Prefix(BlockingRule): ...      # Group by ISBN-13 prefix
+class YearRange(BlockingRule): ...         # Group by year range
+class LanguageBlock(BlockingRule): ...     # Group by language code
+class CompositeBlock(BlockingRule): ...    # Combine multiple rules
 ```
 
 ## Configuration
@@ -250,6 +271,15 @@ class MatchConfig:
     # Normalization
     strip_subtitles: bool = True
     strip_series_markers: bool = True
+    publisher_weight: float = 0.0
+    year_proximity_range: int = 2
+
+    @classmethod
+    def strict(cls) -> MatchConfig: ...
+    @classmethod
+    def lenient(cls) -> MatchConfig: ...
+    @classmethod
+    def isbn_only(cls) -> MatchConfig: ...
 
 
 @dataclass
@@ -260,6 +290,22 @@ class BatchConfig:
     chunk_size: int = 1000
     progress_interval: float = 1.0  # seconds between progress updates
     min_confidence: float = 0.5     # don't return matches below this
+    max_results_per_book: int = 5
+    stream_results: bool = True
+```
+
+```python
+@dataclass
+class SourceConfig:
+    """Configuration for metadata sources."""
+
+    timeout_seconds: float = 10.0
+    max_retries: int = 3
+    retry_delay_seconds: float = 1.0
+    cache_ttl_seconds: int = 3600
+    cache_max_size: int = 10000
+    max_results_per_query: int = 10
+    prefer_isbn_lookup: bool = True
 ```
 
 ## Explainability
