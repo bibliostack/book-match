@@ -26,6 +26,26 @@ jobs:
       - name: Install build tools
         run: pip install build
 
+      - name: Append dev version suffix
+        run: |
+          python - << 'PY'
+          import datetime, pathlib, tomllib
+
+          path = pathlib.Path("pyproject.toml")
+          text = path.read_text(encoding="utf-8")
+          version = tomllib.loads(text)["project"]["version"]
+          timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d%H%M%S")
+          dev_version = f"{version}.dev{timestamp}"
+
+          old_line = f'version = "{version}"'
+          new_line = f'version = "{dev_version}"'
+          if old_line not in text:
+              raise SystemExit(f"{old_line!r} not found in pyproject.toml")
+
+          path.write_text(text.replace(old_line, new_line, 1), encoding="utf-8")
+          print(f"Publishing version: {dev_version}")
+          PY
+
       - name: Build sdist and wheel
         run: python -m build
 
