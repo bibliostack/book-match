@@ -79,6 +79,19 @@ class BookResolver:
         self.strategy = strategy
         self.min_agreeing_sources = min_agreeing_sources
 
+        if self.strategy == ResolveStrategy.CONSENSUS:
+            num_sources = len(self.sources)
+            if min_agreeing_sources < 2:
+                raise ValueError(
+                    "min_agreeing_sources must be at least 2 when using the "
+                    "CONSENSUS resolve strategy"
+                )
+            if min_agreeing_sources > num_sources:
+                raise ValueError(
+                    "min_agreeing_sources cannot exceed the number of configured "
+                    f"sources (got {min_agreeing_sources}, have {num_sources})"
+                )
+
     async def _query_source(
         self,
         source: MetadataSource,

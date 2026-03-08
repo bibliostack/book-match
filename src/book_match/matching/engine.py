@@ -512,10 +512,12 @@ class BookMatcher:
 
         factors.extend([title_factor, author_factor, year_factor, language_factor])
 
-        # Optional publisher factor (only when weight > 0)
-        if self.config.publisher_weight > 0:
-            publisher_factor = self._compare_publishers(local.publisher, remote.publisher)
-            factors.append(publisher_factor)
+        # Publisher factor: always compute so MatchKind classification can use
+        # publisher similarity consistently. When publisher_weight is 0, the
+        # factor's contribution will also be 0, so it won't affect confidence
+        # but remains available for classification.
+        publisher_factor = self._compare_publishers(local.publisher, remote.publisher)
+        factors.append(publisher_factor)
 
         # Series/volume factor (informational — adjusts confidence, not weighted)
         series_factor = self._compare_series(local.title, remote.title)

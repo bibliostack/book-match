@@ -213,12 +213,15 @@ class TestEdgeCases:
 
 
 class TestPublisherScoring:
-    def test_publisher_default_weight_no_effect(self, matcher):
-        """Default publisher_weight=0.0 means no publisher factor in results."""
+    def test_publisher_default_weight_zero_contribution(self, matcher):
+        """Default publisher_weight=0.0 means publisher factor has zero contribution."""
         local = Book(title="Test", authors=("Author",), publisher="Penguin")
         remote = Book(title="Test", authors=("Author",), publisher="Vintage")
         result = matcher.match(local, remote)
-        assert result.get_factor("publisher") is None
+        pub_factor = result.get_factor("publisher")
+        assert pub_factor is not None
+        assert pub_factor.weight == 0.0
+        assert pub_factor.contribution == 0.0
 
     def test_publisher_match_with_weight(self):
         config = MatchConfig(

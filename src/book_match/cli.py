@@ -7,7 +7,8 @@ import json
 import sys
 from typing import Any
 
-from book_match.core.config import MatchConfig
+from book_match.batch.processor import BatchMatcher
+from book_match.core.config import BatchConfig, MatchConfig
 from book_match.core.types import Book, MatchResult
 from book_match.matching.engine import BookMatcher
 
@@ -96,9 +97,6 @@ def cmd_match(args: argparse.Namespace) -> None:
 
 def cmd_dedup(args: argparse.Namespace) -> None:
     """Handle the 'dedup' subcommand."""
-    from book_match.batch.processor import BatchMatcher
-    from book_match.core.config import BatchConfig
-
     try:
         with open(args.input) as f:
             raw_books = json.load(f)
