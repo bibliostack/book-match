@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from book_match.core.types import Book, MatchFactor, MatchVerdict
 
 
@@ -92,15 +94,21 @@ def explain_isbn_factor(factor: MatchFactor) -> str:
         return "No ISBN available for verification"
 
 
-def explain_year_factor(factor: MatchFactor) -> str:
-    """Generate explanation for year comparison."""
+def explain_year_factor(factor: MatchFactor, year_proximity_range: int = 2) -> str:
+    """Generate explanation for year comparison.
+
+    Args:
+        factor: The year match factor.
+        year_proximity_range: Years within this range are considered "close".
+            Should match ``MatchConfig.year_proximity_range`` for consistency.
+    """
     if factor.matched_values:
         local, remote = factor.matched_values
         if local == remote:
             return f"Publication year matches: {local}"
         else:
             diff = abs(int(local) - int(remote)) if local and remote else 0
-            if diff <= 2:
+            if diff <= year_proximity_range:
                 return f"Publication years close: {local} vs {remote} ({diff} year difference)"
             else:
                 return f"Publication years differ: {local} vs {remote}"
@@ -151,16 +159,23 @@ def explain_publisher_factor(factor: MatchFactor) -> str:
     return f"Publisher {sim_desc} match ({pct})"
 
 
-def explain_factor(factor: MatchFactor) -> str:
-    """Generate human-readable explanation for a match factor."""
-    explainers = {
+def explain_factor(factor: MatchFactor, year_proximity_range: int = 2) -> str:
+    """Generate human-readable explanation for a match factor.
+
+    Args:
+        factor: The match factor to explain.
+        year_proximity_range: Passed through to ``explain_year_factor``.
+    """
+    explainers: dict[str, Callable[[MatchFactor], str]] = {
         "title": explain_title_factor,
         "author": explain_author_factor,
         "isbn": explain_isbn_factor,
-        "year": explain_year_factor,
         "language": explain_language_factor,
         "publisher": explain_publisher_factor,
     }
+
+    if factor.name == "year":
+        return explain_year_factor(factor, year_proximity_range=year_proximity_range)
 
     explainer = explainers.get(factor.name)
     if explainer:
@@ -245,3 +260,39 @@ def generate_short_explanation(
         if top_factor and top_factor.similarity < 0.5:
             return f"Unlikely: {top_factor.name} mismatch ({pct})"
         return f"Low confidence ({pct})"
+
+
+def _factor_to_reason_code(factor: MatchFactor) -> str | None:
+    """Map a MatchFactor to a machine-readable reason code."""
+    name = factor.name
+    sim = factor.similarity
+
+    if name == "isbn":
+        return "ISBN_MATCH" if sim >= 1.0 else "ISBN_MISMATCH"
+    elif name == "title":
+        if sim >= 0.95:
+            return "TITLE_EXACT"
+        elif sim >= 0.80:
+            return "TITLE_STRONG"
+        else:
+            return "TITLE_WEAK"
+    elif name == "author":
+        return "AUTHOR_MATCH" if sim >= 0.90 else "AUTHOR_WEAK"
+    elif name == "language":
+        return "LANGUAGE_MATCH" if sim >= 1.0 else "LANGUAGE_MISMATCH"
+    elif name == "year":
+        if sim >= 1.0:
+            return "YEAR_MATCH"
+        elif sim >= 0.8:
+            return "YEAR_CLOSE"
+        else:
+            return "YEAR_MISMATCH"
+    elif name == "publisher":
+        return "PUBLISHER_MATCH" if sim >= 0.80 else "PUBLISHER_WEAK"
+    elif name == "series":
+        if sim >= 1.0:
+            return "SERIES_MATCH"
+        elif sim <= 0.0:
+            return "SERIES_MISMATCH"
+        return None
+    return None

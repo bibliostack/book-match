@@ -10,6 +10,7 @@ import asyncio
 import logging
 import re
 from typing import Any
+from urllib.parse import urlparse
 
 from book_match.core.config import SourceConfig
 from book_match.core.exceptions import SourceRequestError
@@ -70,6 +71,9 @@ class OpenLibrarySource(BaseSource):
     def name(self) -> str:
         return "openlibrary"
 
+    # Allowed redirect hosts for OpenLibrary
+    _ALLOWED_REDIRECT_HOSTS = {"openlibrary.org", "www.openlibrary.org"}
+
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create the HTTP client."""
         if self._client is None or self._client.is_closed:
@@ -77,8 +81,21 @@ class OpenLibrarySource(BaseSource):
                 timeout=self.timeout,
                 headers={"User-Agent": "book-match/1.0"},
                 follow_redirects=True,
+                event_hooks={"response": [self._validate_redirect]},
             )
         return self._client
+
+    async def _validate_redirect(self, response: httpx.Response) -> None:
+        """Validate that redirect destinations stay within allowed hosts."""
+        if response.is_redirect or response.has_redirect_location:
+            location = response.headers.get("location", "")
+            if location.startswith("http"):
+                parsed = urlparse(location)
+                if parsed.hostname and parsed.hostname not in self._ALLOWED_REDIRECT_HOSTS:
+                    raise SourceRequestError(
+                        self.name,
+                        f"Redirect to disallowed host: {parsed.hostname}",
+                    )
 
     async def _request(self, url: str, params: dict[str, str] | None = None) -> dict[str, Any]:
         """Make an HTTP request with retries."""

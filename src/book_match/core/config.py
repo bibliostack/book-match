@@ -139,9 +139,6 @@ class SourceConfig:
     max_retries: int = 3
     retry_delay_seconds: float = 1.0
 
-    # Rate limiting
-    requests_per_second: float = 5.0
-
     # Caching
     cache_ttl_seconds: int = 3600  # 1 hour
     cache_max_size: int = 10000

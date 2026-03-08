@@ -96,9 +96,15 @@ def extract_series_info(title: str | None) -> tuple[str | None, int | None]:
     return clean_title, volume
 
 
+# Shared set of title articles across multiple languages (English, Spanish, French, German).
+# Used by both normalizers and blocking strategies.
+TITLE_ARTICLES = frozenset(
+    {"the", "a", "an", "el", "la", "le", "les", "das", "der", "die", "ein", "eine"}
+)
+
 # Article prefixes that can be moved/removed
 _ARTICLE_PATTERN = re.compile(
-    r"^(the|a|an|el|la|le|les|das|der|die|ein|eine)\s+",
+    r"^(" + "|".join(TITLE_ARTICLES) + r")\s+",
     re.IGNORECASE,
 )
 

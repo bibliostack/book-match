@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from collections.abc import Sequence
 from enum import Enum
@@ -22,6 +23,19 @@ from book_match.isbn.normalize import normalize_isbn
 from book_match.matching.engine import BookMatcher
 
 logger = logging.getLogger(__name__)
+
+# Pattern to match API keys in URLs (key=VALUE or api_key=VALUE)
+_SENSITIVE_PARAM_PATTERN = re.compile(
+    r"([?&](?:key|api_key|apikey|token|access_token)=)[^&\s]+",
+    re.IGNORECASE,
+)
+
+
+def _sanitize_error(error: Exception) -> str:
+    """Sanitize error messages by redacting sensitive URL parameters."""
+    msg = str(error)
+    return _SENSITIVE_PARAM_PATTERN.sub(r"\1[REDACTED]", msg)
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -92,6 +106,39 @@ class BookResolver:
                     f"sources (got {min_agreeing_sources}, have {num_sources})"
                 )
 
+    def _apply_strategy(
+        self,
+        results: list[MatchResult],
+        all_candidates: list[Book],
+    ) -> list[MatchResult]:
+        """Apply the configured resolution strategy to filter/sort results."""
+        if self.strategy == ResolveStrategy.FIRST_CONFIDENT:
+            for result in results:
+                if result.should_auto_accept:
+                    return [result]
+            return []  # No confident match found
+
+        elif self.strategy == ResolveStrategy.ALL_SOURCES:
+            best_by_source: dict[str, MatchResult] = {}
+            for result in results:
+                source = result.remote_book.source
+                if source:
+                    if source not in best_by_source:
+                        best_by_source[source] = result
+                    elif result.confidence > best_by_source[source].confidence:
+                        best_by_source[source] = result
+            return sorted(
+                best_by_source.values(),
+                key=lambda r: r.confidence,
+                reverse=True,
+            )
+
+        elif self.strategy == ResolveStrategy.CONSENSUS:
+            return self._apply_consensus(results, all_candidates)
+
+        # BEST_MATCH: just return results as-is (already sorted by confidence)
+        return results
+
     async def _query_source(
         self,
         source: MetadataSource,
@@ -148,31 +195,7 @@ class BookResolver:
         )
 
         # Apply strategy
-        if self.strategy == ResolveStrategy.FIRST_CONFIDENT:
-            # Return first auto-accept match
-            for result in results:
-                if result.should_auto_accept:
-                    return [result]
-            # Fall through to return best matches
-
-        elif self.strategy == ResolveStrategy.ALL_SOURCES:
-            # Return best match from each source
-            best_by_source: dict[str, MatchResult] = {}
-            for result in results:
-                source = result.remote_book.source
-                if source:
-                    if source not in best_by_source:
-                        best_by_source[source] = result
-                    elif result.confidence > best_by_source[source].confidence:
-                        best_by_source[source] = result
-            results = sorted(
-                best_by_source.values(),
-                key=lambda r: r.confidence,
-                reverse=True,
-            )
-
-        elif self.strategy == ResolveStrategy.CONSENSUS:
-            results = self._apply_consensus(results, all_candidates)
+        results = self._apply_strategy(results, all_candidates)
 
         return results[:max_results]
 
@@ -245,7 +268,7 @@ class BookResolver:
                 status=SourceStatus.TIMEOUT,
                 result_count=0,
                 duration_ms=elapsed,
-                error_message=str(e),
+                error_message=_sanitize_error(e),
             )
         except SourceRateLimitError as e:
             elapsed = (time.monotonic() - start) * 1000
@@ -254,7 +277,7 @@ class BookResolver:
                 status=SourceStatus.RATE_LIMITED,
                 result_count=0,
                 duration_ms=elapsed,
-                error_message=str(e),
+                error_message=_sanitize_error(e),
             )
         except Exception as e:
             elapsed = (time.monotonic() - start) * 1000
@@ -263,7 +286,7 @@ class BookResolver:
                 status=SourceStatus.ERROR,
                 result_count=0,
                 duration_ms=elapsed,
-                error_message=str(e),
+                error_message=_sanitize_error(e),
             )
 
     async def resolve_with_diagnostics(
@@ -309,32 +332,8 @@ class BookResolver:
 
         results = self.matcher.match_many(book, all_candidates, min_confidence=min_confidence)
 
-        # Apply the configured strategy (same logic as resolve())
-        if self.strategy == ResolveStrategy.FIRST_CONFIDENT:
-            for result in results:
-                if result.should_auto_accept:
-                    return ResolveOutcome(
-                        results=(result,),
-                        source_diagnostics=tuple(diagnostics),
-                    )
-
-        elif self.strategy == ResolveStrategy.ALL_SOURCES:
-            best_by_source: dict[str, MatchResult] = {}
-            for result in results:
-                source = result.remote_book.source
-                if source:
-                    if source not in best_by_source:
-                        best_by_source[source] = result
-                    elif result.confidence > best_by_source[source].confidence:
-                        best_by_source[source] = result
-            results = sorted(
-                best_by_source.values(),
-                key=lambda r: r.confidence,
-                reverse=True,
-            )
-
-        elif self.strategy == ResolveStrategy.CONSENSUS:
-            results = self._apply_consensus(results, all_candidates)
+        # Apply the configured strategy
+        results = self._apply_strategy(results, all_candidates)
 
         return ResolveOutcome(
             results=tuple(results[:max_results]),

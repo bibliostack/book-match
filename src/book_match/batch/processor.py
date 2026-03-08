@@ -322,17 +322,31 @@ class BatchMatcher:
                     all_pairs[i : i + chunk_size] for i in range(0, len(all_pairs), chunk_size)
                 ]
                 with ThreadPoolExecutor(max_workers=self.config.max_workers) as executor:
-                    futures = [
-                        executor.submit(self._compare_link_pairs, left, right, chunk)
+                    futures_with_sizes = [
+                        (
+                            executor.submit(self._compare_link_pairs, left, right, chunk),
+                            len(chunk),
+                        )
                         for chunk in chunks
                     ]
-                    for future in futures:
+                    for future, chunk_len in futures_with_sizes:
                         chunk_results = future.result()
+                        completed += chunk_len
                         for left_idx, result in chunk_results:
                             if left_idx not in best_matches:
                                 best_matches[left_idx] = result
                             elif result.confidence > best_matches[left_idx].confidence:
                                 best_matches[left_idx] = result
+                        if on_progress:
+                            elapsed = time.time() - start_time
+                            on_progress(
+                                BatchProgress(
+                                    total=total_comparisons,
+                                    completed=completed,
+                                    matches_found=len(best_matches),
+                                    elapsed_seconds=elapsed,
+                                )
+                            )
             else:
                 for left_idx, right_idx in all_pairs:
                     left_book = left[left_idx]
