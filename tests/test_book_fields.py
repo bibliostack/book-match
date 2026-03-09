@@ -104,3 +104,75 @@ def test_google_books_missing_extended_fields():
     assert book.cover_url is None
     assert book.subjects == ()
     assert book.page_count is None
+
+
+# --- OpenLibrary source parsing tests ---
+
+from book_match.sources.openlibrary import OpenLibrarySource
+
+
+def test_openlibrary_parses_cover_from_cover_i():
+    """Search results use cover_i field."""
+    source = OpenLibrarySource()
+    data = {"title": "Test Book", "cover_i": 12345}
+    book = source._parse_book(data)
+    assert book.cover_url == "https://covers.openlibrary.org/b/id/12345-M.jpg"
+
+
+def test_openlibrary_parses_cover_from_covers_list():
+    """Direct lookups use covers list."""
+    source = OpenLibrarySource()
+    data = {"title": "Test Book", "covers": [67890, 11111]}
+    book = source._parse_book(data)
+    assert book.cover_url == "https://covers.openlibrary.org/b/id/67890-M.jpg"
+
+
+def test_openlibrary_parses_subjects_from_subject():
+    """Search results use 'subject' field."""
+    source = OpenLibrarySource()
+    data = {"title": "Test Book", "subject": ["Fiction", "Adventure"]}
+    book = source._parse_book(data)
+    assert book.subjects == ("Fiction", "Adventure")
+
+
+def test_openlibrary_parses_subjects_from_subjects_dicts():
+    """Direct lookups may have subjects as dicts with 'name' key."""
+    source = OpenLibrarySource()
+    data = {
+        "title": "Test Book",
+        "subjects": [{"name": "Fiction"}, {"name": "Drama"}],
+    }
+    book = source._parse_book(data)
+    assert book.subjects == ("Fiction", "Drama")
+
+
+def test_openlibrary_parses_subjects_from_subjects_strings():
+    """Direct lookups may also have subjects as plain strings."""
+    source = OpenLibrarySource()
+    data = {"title": "Test Book", "subjects": ["Fiction", "Drama"]}
+    book = source._parse_book(data)
+    assert book.subjects == ("Fiction", "Drama")
+
+
+def test_openlibrary_parses_page_count():
+    source = OpenLibrarySource()
+    data = {"title": "Test Book", "number_of_pages": 312}
+    book = source._parse_book(data)
+    assert book.page_count == 312
+
+
+def test_openlibrary_parses_page_count_median():
+    """Search results use number_of_pages_median."""
+    source = OpenLibrarySource()
+    data = {"title": "Test Book", "number_of_pages_median": 305}
+    book = source._parse_book(data)
+    assert book.page_count == 305
+
+
+def test_openlibrary_missing_extended_fields():
+    source = OpenLibrarySource()
+    data = {"title": "Test Book"}
+    book = source._parse_book(data)
+    assert book.cover_url is None
+    assert book.subjects == ()
+    assert book.page_count is None
