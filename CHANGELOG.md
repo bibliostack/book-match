@@ -1,6 +1,42 @@
 # CHANGELOG
 
 
+## v1.1.0 (2026-03-09)
+
+### Documentation
+
+- Fix badges and align documentation with codebase
+  ([#53](https://github.com/bibliostack/book-match/pull/53),
+  [`077f01a`](https://github.com/bibliostack/book-match/commit/077f01ab71afd0620d6ed206070c4655ee877d78))
+
+Replace broken PyPI badge with CI status badge, use dynamic shields.io badges for Python version and
+  license. Expand README to document all exported APIs including MatchKind, ResolveStrategy,
+  quick_score(), dataset linking, all blocking rules, and the full exception hierarchy. Update
+  ARCHITECTURE.md with missing types, correct method signatures, and SourceConfig.
+
+### Features
+
+- Add cover_url, subjects, page_count to Book type
+  ([#55](https://github.com/bibliostack/book-match/pull/55),
+  [`3ddcf7f`](https://github.com/bibliostack/book-match/commit/3ddcf7f62e7c7e7d96244f278420771f407c72f6))
+
+* feat: add cover_url, subjects, page_count fields to Book dataclass
+
+* feat: extract cover_url, subjects, page_count in GoogleBooksSource
+
+* feat: extract cover_url, subjects, page_count in OpenLibrarySource
+
+* fix: use explicit None check for page_count and request new fields in search
+
+- Use `is None` instead of `or` for page_count fallback to handle 0 correctly - Add cover_i,
+  subject, number_of_pages_median to OpenLibrary search fields param
+
+* fix: address PR review comments
+
+- Move imports to top of test file (fixes E402 lint error) - Guard cover_i against None values to
+  prevent invalid URLs - Add test for page_count=0 edge case
+
+
 ## v1.0.0 (2026-03-08)
 
 ### Chores
