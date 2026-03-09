@@ -173,6 +173,16 @@ class GoogleBooksSource(BaseSource):
         # Description
         description = volume_info.get("description")
 
+        # Cover image
+        image_links = volume_info.get("imageLinks", {})
+        cover_url = image_links.get("thumbnail")
+
+        # Subjects/categories
+        subjects = tuple(volume_info.get("categories", []))
+
+        # Page count
+        page_count = volume_info.get("pageCount")
+
         # Source ID
         source_id = item.get("id")
 
@@ -185,6 +195,9 @@ class GoogleBooksSource(BaseSource):
             year=year,
             publisher=publisher,
             description=description,
+            cover_url=cover_url,
+            subjects=subjects,
+            page_count=page_count,
             source=self.name,
             source_id=source_id,
         )

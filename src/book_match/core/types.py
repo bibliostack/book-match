@@ -47,6 +47,9 @@ class Book:
     year: int | None = None
     publisher: str | None = None
     description: str | None = None
+    cover_url: str | None = None
+    subjects: tuple[str, ...] = ()
+    page_count: int | None = None
 
     # Provenance tracking
     source: str | None = None
@@ -56,6 +59,9 @@ class Book:
         # Ensure authors is always a tuple
         if isinstance(self.authors, list):
             object.__setattr__(self, "authors", tuple(self.authors))
+        # Ensure subjects is always a tuple
+        if isinstance(self.subjects, list):
+            object.__setattr__(self, "subjects", tuple(self.subjects))
 
     @property
     def has_isbn(self) -> bool:

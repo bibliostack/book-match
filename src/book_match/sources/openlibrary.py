@@ -187,6 +187,31 @@ class OpenLibrarySource(BaseSource):
             elif "edition_key" in data and data["edition_key"]:
                 source_id = data["edition_key"][0]
 
+        # Cover URL
+        cover_url: str | None = None
+        if "cover_i" in data and data["cover_i"]:
+            cover_url = f"https://covers.openlibrary.org/b/id/{data['cover_i']}-M.jpg"
+        elif "covers" in data and data["covers"]:
+            cover_url = f"https://covers.openlibrary.org/b/id/{data['covers'][0]}-M.jpg"
+
+        # Subjects
+        subjects: list[str] = []
+        if "subject" in data and isinstance(data["subject"], list):
+            subjects = [s for s in data["subject"] if isinstance(s, str)]
+        elif "subjects" in data and isinstance(data["subjects"], list):
+            for s in data["subjects"]:
+                if isinstance(s, dict):
+                    name = s.get("name", "")
+                    if name:
+                        subjects.append(name)
+                elif isinstance(s, str):
+                    subjects.append(s)
+
+        # Page count
+        page_count = data.get("number_of_pages")
+        if page_count is None:
+            page_count = data.get("number_of_pages_median")
+
         return Book(
             title=title,
             authors=tuple(a for a in authors if a),
@@ -197,6 +222,9 @@ class OpenLibrarySource(BaseSource):
             publisher=data.get("publisher", [None])[0]
             if isinstance(data.get("publisher"), list)
             else data.get("publisher"),
+            cover_url=cover_url,
+            subjects=tuple(subjects),
+            page_count=page_count,
             source=self.name,
             source_id=source_id,
         )
@@ -221,7 +249,7 @@ class OpenLibrarySource(BaseSource):
         # Build search query
         params: dict[str, Any] = {
             "limit": limit,
-            "fields": "key,title,author_name,isbn,first_publish_year,language,publisher,edition_key",
+            "fields": "key,title,author_name,isbn,first_publish_year,language,publisher,edition_key,cover_i,subject,number_of_pages_median",
         }
 
         # Prefer ISBN search if available (when prefer_isbn_lookup is enabled)
