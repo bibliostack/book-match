@@ -1,8 +1,8 @@
 """Tests for extended Book fields (cover_url, subjects, page_count)."""
 
+import pytest
+
 from book_match.core.types import Book
-from book_match.sources.google_books import GoogleBooksSource
-from book_match.sources.openlibrary import OpenLibrarySource
 
 
 def test_book_has_cover_url_field():
@@ -49,6 +49,11 @@ def test_book_subjects_list_coerced_to_tuple():
 
 
 # --- Google Books source parsing tests ---
+
+pytestmark_sources = pytest.importorskip("httpx")
+
+from book_match.sources.google_books import GoogleBooksSource  # noqa: E402
+from book_match.sources.openlibrary import OpenLibrarySource  # noqa: E402
 
 
 def test_google_books_parses_cover_url():
