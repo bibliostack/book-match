@@ -1,6 +1,18 @@
 # CHANGELOG
 
 
+## v1.2.0 (2026-03-09)
+
+### Bug Fixes
+
+- Skip source parser tests when httpx is not installed
+  ([#56](https://github.com/bibliostack/book-match/pull/56),
+  [`5aa2869`](https://github.com/bibliostack/book-match/commit/5aa286955450f1d3694d94825dad12fdb1c55891))
+
+Use pytest.importorskip("httpx") so GoogleBooksSource/OpenLibrarySource tests are skipped in the
+  smoke test environment where httpx is not available as a dependency.
+
+
 ## v1.1.0 (2026-03-09)
 
 ### Documentation
