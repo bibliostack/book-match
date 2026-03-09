@@ -208,7 +208,9 @@ class OpenLibrarySource(BaseSource):
                     subjects.append(s)
 
         # Page count
-        page_count = data.get("number_of_pages") or data.get("number_of_pages_median")
+        page_count = data.get("number_of_pages")
+        if page_count is None:
+            page_count = data.get("number_of_pages_median")
 
         return Book(
             title=title,
@@ -247,7 +249,7 @@ class OpenLibrarySource(BaseSource):
         # Build search query
         params: dict[str, Any] = {
             "limit": limit,
-            "fields": "key,title,author_name,isbn,first_publish_year,language,publisher,edition_key",
+            "fields": "key,title,author_name,isbn,first_publish_year,language,publisher,edition_key,cover_i,subject,number_of_pages_median",
         }
 
         # Prefer ISBN search if available (when prefer_isbn_lookup is enabled)
