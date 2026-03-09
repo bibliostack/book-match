@@ -189,7 +189,7 @@ class OpenLibrarySource(BaseSource):
 
         # Cover URL
         cover_url: str | None = None
-        if "cover_i" in data:
+        if "cover_i" in data and data["cover_i"]:
             cover_url = f"https://covers.openlibrary.org/b/id/{data['cover_i']}-M.jpg"
         elif "covers" in data and data["covers"]:
             cover_url = f"https://covers.openlibrary.org/b/id/{data['covers'][0]}-M.jpg"

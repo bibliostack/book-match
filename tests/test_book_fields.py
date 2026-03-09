@@ -1,6 +1,8 @@
 """Tests for extended Book fields (cover_url, subjects, page_count)."""
 
 from book_match.core.types import Book
+from book_match.sources.google_books import GoogleBooksSource
+from book_match.sources.openlibrary import OpenLibrarySource
 
 
 def test_book_has_cover_url_field():
@@ -47,8 +49,6 @@ def test_book_subjects_list_coerced_to_tuple():
 
 
 # --- Google Books source parsing tests ---
-
-from book_match.sources.google_books import GoogleBooksSource
 
 
 def test_google_books_parses_cover_url():
@@ -108,8 +108,6 @@ def test_google_books_missing_extended_fields():
 
 # --- OpenLibrary source parsing tests ---
 
-from book_match.sources.openlibrary import OpenLibrarySource
-
 
 def test_openlibrary_parses_cover_from_cover_i():
     """Search results use cover_i field."""
@@ -167,6 +165,14 @@ def test_openlibrary_parses_page_count_median():
     data = {"title": "Test Book", "number_of_pages_median": 305}
     book = source._parse_book(data)
     assert book.page_count == 305
+
+
+def test_openlibrary_page_count_zero_not_falsy():
+    """Ensure page_count of 0 is preserved and doesn't fall through to median."""
+    source = OpenLibrarySource()
+    data = {"title": "Test Book", "number_of_pages": 0, "number_of_pages_median": 305}
+    book = source._parse_book(data)
+    assert book.page_count == 0
 
 
 def test_openlibrary_missing_extended_fields():
