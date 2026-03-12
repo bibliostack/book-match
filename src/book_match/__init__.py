@@ -54,6 +54,9 @@ from book_match.batch import (
 # Configuration
 from book_match.core.config import BatchConfig, MatchConfig, SourceConfig
 
+# Sources
+from book_match.sources import GoogleBooksSource, OpenLibrarySource
+
 # Exceptions
 from book_match.core.exceptions import (
     BatchError,
