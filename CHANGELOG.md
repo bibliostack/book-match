@@ -38,10 +38,8 @@ Replace broken PyPI badge with CI status badge, use dynamic shields.io badges fo
 
 * feat: extract cover_url, subjects, page_count in OpenLibrarySource
 
-* fix: use explicit None check for page_count and request new fields in search
-
-- Use `is None` instead of `or` for page_count fallback to handle 0 correctly - Add cover_i,
-  subject, number_of_pages_median to OpenLibrary search fields param
+- Use `is None` instead of `or` for page_count fallback to handle 0 correctly, and request
+  `cover_i`, `subject`, and `number_of_pages_median` in the OpenLibrary search fields parameter.
 
 * fix: address PR review comments
 
