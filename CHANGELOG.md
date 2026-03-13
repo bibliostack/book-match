@@ -43,9 +43,9 @@ Replace broken PyPI badge with CI status badge, use dynamic shields.io badges fo
 
 * fix: address PR review comments
 
-- Move imports to top of test file (fixes E402 lint error) - Guard cover_i against None values to
-  prevent invalid URLs - Add test for page_count=0 edge case
-
+- Move imports to top of test file (fixes E402 lint error)
+- Guard `cover_i` against `None` values to prevent invalid URLs
+- Add test for `page_count=0` edge case
 
 ## v1.0.0 (2026-03-08)
 
