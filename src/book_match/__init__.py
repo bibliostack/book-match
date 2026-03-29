@@ -82,13 +82,17 @@ from book_match.core.types import (
 
 # ISBN utilities
 from book_match.isbn import (
+    calculate_isbn10_checksum,
+    calculate_isbn13_checksum,
     compare_isbns,
     extract_isbns,
+    format_isbn,
     is_valid_isbn,
     is_valid_isbn10,
     is_valid_isbn13,
     isbn10_to_isbn13,
     isbn13_to_isbn10,
+    isbn_match_score,
     normalize_isbn,
     normalize_to_isbn13,
     validate_isbn,
@@ -132,8 +136,16 @@ from book_match.sources import (
 )
 
 
-def __getattr__(name: str) -> type:
-    """Lazy loading for optional source classes."""
+def __getattr__(name: str) -> type[BaseSource]:
+    """Lazy-load optional source classes that require ``httpx``.
+
+    Returns the *class* (not an instance) for ``GoogleBooksSource`` or
+    ``OpenLibrarySource``.  Both are concrete subclasses of
+    :class:`BaseSource`.
+
+    Raises:
+        AttributeError: If *name* is not a known lazy-loaded attribute.
+    """
     if name == "GoogleBooksSource":
         from book_match.sources.google_books import GoogleBooksSource
 
@@ -187,6 +199,10 @@ __all__ = [
     "normalize_to_isbn13",
     "compare_isbns",
     "extract_isbns",
+    "format_isbn",
+    "isbn_match_score",
+    "calculate_isbn10_checksum",
+    "calculate_isbn13_checksum",
     # Normalizers
     "normalize_text",
     "normalize_title",

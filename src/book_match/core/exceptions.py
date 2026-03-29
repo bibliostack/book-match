@@ -18,7 +18,7 @@ class ISBNError(BookMatchError):
 class InvalidISBNError(ISBNError):
     """Raised when an ISBN is invalid."""
 
-    def __init__(self, isbn: str, reason: str | None = None):
+    def __init__(self, isbn: str, reason: str | None = None) -> None:
         self.isbn = isbn
         self.reason = reason
         message = f"Invalid ISBN: {isbn}"
@@ -36,7 +36,7 @@ class SourceError(BookMatchError):
 class SourceNotFoundError(SourceError):
     """Raised when a requested source is not registered."""
 
-    def __init__(self, source_name: str):
+    def __init__(self, source_name: str) -> None:
         self.source_name = source_name
         super().__init__(f"Metadata source not found: {source_name}")
 
@@ -49,7 +49,7 @@ class SourceRequestError(SourceError):
         source_name: str,
         message: str,
         status_code: int | None = None,
-    ):
+    ) -> None:
         self.source_name = source_name
         self.status_code = status_code
         full_message = f"[{source_name}] {message}"
@@ -61,7 +61,7 @@ class SourceRequestError(SourceError):
 class SourceRateLimitError(SourceError):
     """Raised when a metadata source rate limits us."""
 
-    def __init__(self, source_name: str, retry_after: float | None = None):
+    def __init__(self, source_name: str, retry_after: float | None = None) -> None:
         self.source_name = source_name
         self.retry_after = retry_after
         message = f"Rate limited by {source_name}"

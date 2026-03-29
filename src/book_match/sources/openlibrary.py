@@ -49,7 +49,7 @@ class OpenLibrarySource(BaseSource):
         timeout: float = 10.0,
         max_retries: int = 3,
         config: SourceConfig | None = None,
-    ):
+    ) -> None:
         """Initialize the OpenLibrary source.
 
         Args:
@@ -66,6 +66,7 @@ class OpenLibrarySource(BaseSource):
         self._retry_delay = config.retry_delay_seconds if config else 1.0
         self._prefer_isbn_lookup = config.prefer_isbn_lookup if config else True
         self._client: httpx.AsyncClient | None = None
+        self._client_lock = asyncio.Lock()
 
     @property
     def name(self) -> str:
@@ -76,13 +77,14 @@ class OpenLibrarySource(BaseSource):
 
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create the HTTP client."""
-        if self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient(
-                timeout=self.timeout,
-                headers={"User-Agent": "book-match/1.0"},
-                follow_redirects=True,
-                event_hooks={"response": [self._validate_redirect]},
-            )
+        async with self._client_lock:
+            if self._client is None or self._client.is_closed:
+                self._client = httpx.AsyncClient(
+                    timeout=self.timeout,
+                    headers={"User-Agent": "book-match/1.0"},
+                    follow_redirects=True,
+                    event_hooks={"response": [self._validate_redirect]},
+                )
         return self._client
 
     async def _validate_redirect(self, response: httpx.Response) -> None:
@@ -97,7 +99,7 @@ class OpenLibrarySource(BaseSource):
                         f"Redirect to disallowed host: {parsed.hostname}",
                     )
 
-    async def _request(self, url: str, params: dict[str, str] | None = None) -> dict[str, Any]:
+    async def _request(self, url: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Make an HTTP request with retries."""
         client = await self._get_client()
         last_error: Exception | None = None
@@ -197,15 +199,17 @@ class OpenLibrarySource(BaseSource):
         # Subjects
         subjects: list[str] = []
         if "subject" in data and isinstance(data["subject"], list):
-            subjects = [s for s in data["subject"] if isinstance(s, str)]
+            subjects = [
+                subject_entry for subject_entry in data["subject"] if isinstance(subject_entry, str)
+            ]
         elif "subjects" in data and isinstance(data["subjects"], list):
-            for s in data["subjects"]:
-                if isinstance(s, dict):
-                    name = s.get("name", "")
+            for subject_entry in data["subjects"]:
+                if isinstance(subject_entry, dict):
+                    name = subject_entry.get("name", "")
                     if name:
                         subjects.append(name)
-                elif isinstance(s, str):
-                    subjects.append(s)
+                elif isinstance(subject_entry, str):
+                    subjects.append(subject_entry)
 
         # Page count
         page_count = data.get("number_of_pages")
@@ -219,9 +223,13 @@ class OpenLibrarySource(BaseSource):
             isbn_13=isbn_13,
             language=language,
             year=year,
-            publisher=data.get("publisher", [None])[0]
-            if isinstance(data.get("publisher"), list)
-            else data.get("publisher"),
+            publisher=(
+                data["publisher"][0]
+                if isinstance(data.get("publisher"), list) and data["publisher"]
+                else (
+                    data.get("publisher") if not isinstance(data.get("publisher"), list) else None
+                )
+            ),
             cover_url=cover_url,
             subjects=tuple(subjects),
             page_count=page_count,
@@ -285,7 +293,7 @@ class OpenLibrarySource(BaseSource):
                 if book.title:  # Only include books with titles
                     books.append(book)
             except (KeyError, TypeError, ValueError) as e:
-                logger.debug("Skipping malformed OpenLibrary entry: %s", e)
+                logger.warning("Skipping malformed OpenLibrary entry: %s", e)
                 continue
 
         return books
@@ -336,9 +344,10 @@ class OpenLibrarySource(BaseSource):
 
     async def close(self) -> None:
         """Close the HTTP client."""
-        if self._client and not self._client.is_closed:
-            await self._client.aclose()
-            self._client = None
+        async with self._client_lock:
+            if self._client and not self._client.is_closed:
+                await self._client.aclose()
+                self._client = None
 
     async def __aenter__(self) -> OpenLibrarySource:
         return self

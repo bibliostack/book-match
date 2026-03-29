@@ -198,7 +198,7 @@ result.confidence  # 0.87
 result.verdict  # MatchVerdict.REVIEW
 
 # Match classification
-result.match_kind  # MatchKind.SAME_WORK
+result.kind  # MatchKind.SAME_WORK
 
 # Human-readable explanation
 result.explanation  # "Possible match (87% confidence)..."
@@ -253,6 +253,7 @@ Proper ISBN validation with checksums:
 
 ```python
 from book_match import (
+    InvalidISBNError,
     is_valid_isbn,
     is_valid_isbn10,
     is_valid_isbn13,
@@ -273,9 +274,14 @@ is_valid_isbn("1234567890")     # False (invalid checksum)
 is_valid_isbn10("0306406152")   # True
 is_valid_isbn13("9780306406157")  # True
 
-# Detailed validation with error reason
-valid, reason = validate_isbn("1234567890")
-# valid=False, reason="Invalid ISBN-10 checksum"
+# Returns normalized ISBN string on success
+normalized = validate_isbn("0-306-40615-2")  # "0306406152"
+
+# Raises InvalidISBNError on failure
+try:
+    validate_isbn("1234567890")
+except InvalidISBNError as e:
+    print(e)  # "Invalid ISBN: 1234567890 (invalid ISBN-10 checksum)"
 
 # Conversion
 isbn10_to_isbn13("0306406152")  # "9780306406157"

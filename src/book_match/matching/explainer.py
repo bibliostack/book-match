@@ -104,10 +104,12 @@ def explain_year_factor(factor: MatchFactor, year_proximity_range: int = 2) -> s
     """
     if factor.matched_values:
         local, remote = factor.matched_values
+        if local is None or remote is None:
+            return factor.details or "Year information incomplete"
         if local == remote:
             return f"Publication year matches: {local}"
         else:
-            diff = abs(int(local) - int(remote)) if local and remote else 0
+            diff = abs(int(local) - int(remote))
             if diff <= year_proximity_range:
                 return f"Publication years close: {local} vs {remote} ({diff} year difference)"
             else:
@@ -191,6 +193,7 @@ def generate_explanation(
     factors: tuple[MatchFactor, ...],
     local_book: Book,
     remote_book: Book,
+    year_proximity_range: int = 2,
 ) -> str:
     """Generate a complete human-readable explanation for a match result.
 
@@ -200,6 +203,8 @@ def generate_explanation(
         factors: Individual match factors
         local_book: The local book being matched
         remote_book: The remote candidate book
+        year_proximity_range: Years within this range are described as "close".
+            Should match MatchConfig.year_proximity_range for consistency.
 
     Returns:
         Multi-sentence human-readable explanation
@@ -212,7 +217,7 @@ def generate_explanation(
     # Explain top factors
     for factor in sorted_factors[:4]:  # Top 4 factors
         if factor.contribution > 0 or factor.name == "isbn":
-            explanation = explain_factor(factor)
+            explanation = explain_factor(factor, year_proximity_range=year_proximity_range)
             if explanation:
                 parts.append(explanation)
 
@@ -279,16 +284,30 @@ def _factor_to_reason_code(factor: MatchFactor) -> str | None:
     elif name == "author":
         return "AUTHOR_MATCH" if sim >= 0.90 else "AUTHOR_WEAK"
     elif name == "language":
-        return "LANGUAGE_MATCH" if sim >= 1.0 else "LANGUAGE_MISMATCH"
+        if sim >= 1.0:
+            return "LANGUAGE_MATCH"
+        elif sim == 0.5:
+            return None  # neutral — data missing
+        else:
+            return "LANGUAGE_MISMATCH"
     elif name == "year":
         if sim >= 1.0:
             return "YEAR_MATCH"
         elif sim >= 0.8:
             return "YEAR_CLOSE"
+        elif sim == 0.5:
+            return None  # neutral — data missing
         else:
             return "YEAR_MISMATCH"
     elif name == "publisher":
-        return "PUBLISHER_MATCH" if sim >= 0.80 else "PUBLISHER_WEAK"
+        if sim >= 0.8:
+            return "PUBLISHER_MATCH"
+        elif sim == 0.5:
+            return None  # neutral — data missing
+        elif sim >= 0.5:
+            return "PUBLISHER_WEAK"
+        else:
+            return "PUBLISHER_MISMATCH"
     elif name == "series":
         if sim >= 1.0:
             return "SERIES_MATCH"

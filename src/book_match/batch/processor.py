@@ -40,7 +40,7 @@ class BatchMatcher:
         match_config: MatchConfig | None = None,
         batch_config: BatchConfig | None = None,
         blocking_rules: Sequence[BlockingRule] | None = None,
-    ):
+    ) -> None:
         """Initialize the batch matcher.
 
         Args:

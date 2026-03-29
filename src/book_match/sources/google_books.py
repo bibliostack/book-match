@@ -50,7 +50,7 @@ class GoogleBooksSource(BaseSource):
         timeout: float = 10.0,
         max_retries: int = 3,
         config: SourceConfig | None = None,
-    ):
+    ) -> None:
         """Initialize the Google Books source.
 
         Args:
@@ -69,6 +69,7 @@ class GoogleBooksSource(BaseSource):
         self._retry_delay = config.retry_delay_seconds if config else 1.0
         self._prefer_isbn_lookup = config.prefer_isbn_lookup if config else True
         self._client: httpx.AsyncClient | None = None
+        self._client_lock = asyncio.Lock()
 
     @property
     def name(self) -> str:
@@ -76,12 +77,13 @@ class GoogleBooksSource(BaseSource):
 
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create the HTTP client."""
-        if self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient(
-                timeout=self.timeout,
-                headers={"User-Agent": "book-match/1.0"},
-                follow_redirects=False,
-            )
+        async with self._client_lock:
+            if self._client is None or self._client.is_closed:
+                self._client = httpx.AsyncClient(
+                    timeout=self.timeout,
+                    headers={"User-Agent": "book-match/1.0"},
+                    follow_redirects=False,
+                )
         return self._client
 
     async def _request(self, params: dict[str, Any]) -> dict[str, Any]:
@@ -257,7 +259,7 @@ class GoogleBooksSource(BaseSource):
                 if book:
                     books.append(book)
             except (KeyError, TypeError, ValueError) as e:
-                logger.debug("Skipping malformed Google Books item: %s", e)
+                logger.warning("Skipping malformed Google Books item: %s", e)
                 continue
 
         return books
@@ -287,6 +289,7 @@ class GoogleBooksSource(BaseSource):
 
         return self._parse_book(data["items"][0])
 
+    # TODO: Route through _request() for retry logic consistency
     async def fetch_by_id(self, source_id: str) -> Book | None:
         """Fetch a book by Google Books volume ID.
 
@@ -313,16 +316,31 @@ class GoogleBooksSource(BaseSource):
 
             return self._parse_book(data)
 
-        except httpx.HTTPStatusError:
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                return None
+            logger.warning(
+                "Source '%s' fetch_by_id failed for id=%s: HTTP %s",
+                self.name,
+                source_id,
+                e.response.status_code,
+            )
             return None
-        except httpx.RequestError:
+        except httpx.RequestError as e:
+            logger.warning(
+                "Source '%s' fetch_by_id network error for id=%s: %s",
+                self.name,
+                source_id,
+                e,
+            )
             return None
 
     async def close(self) -> None:
         """Close the HTTP client."""
-        if self._client and not self._client.is_closed:
-            await self._client.aclose()
-            self._client = None
+        async with self._client_lock:
+            if self._client and not self._client.is_closed:
+                await self._client.aclose()
+                self._client = None
 
     async def __aenter__(self) -> GoogleBooksSource:
         return self

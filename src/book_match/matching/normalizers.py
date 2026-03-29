@@ -307,6 +307,45 @@ def normalize_publisher(publisher: str | None) -> str:
     return normalize_text(result)
 
 
+_LANGUAGE_CODE_MAP: dict[str, str] = {
+    "en": "en",
+    "eng": "en",
+    "english": "en",
+    "es": "es",
+    "spa": "es",
+    "spanish": "es",
+    "español": "es",
+    "fr": "fr",
+    "fre": "fr",
+    "fra": "fr",
+    "french": "fr",
+    "français": "fr",
+    "de": "de",
+    "ger": "de",
+    "deu": "de",
+    "german": "de",
+    "deutsch": "de",
+    "it": "it",
+    "ita": "it",
+    "italian": "it",
+    "italiano": "it",
+    "pt": "pt",
+    "por": "pt",
+    "portuguese": "pt",
+    "português": "pt",
+    "ru": "ru",
+    "rus": "ru",
+    "russian": "ru",
+    "ja": "ja",
+    "jpn": "ja",
+    "japanese": "ja",
+    "zh": "zh",
+    "chi": "zh",
+    "zho": "zh",
+    "chinese": "zh",
+}
+
+
 def normalize_language(language: str | None) -> str:
     """Normalize a language code or name.
 
@@ -321,43 +360,4 @@ def normalize_language(language: str | None) -> str:
 
     lang = language.lower().strip()
 
-    # Common mappings
-    mapping = {
-        "en": "en",
-        "eng": "en",
-        "english": "en",
-        "es": "es",
-        "spa": "es",
-        "spanish": "es",
-        "español": "es",
-        "fr": "fr",
-        "fre": "fr",
-        "fra": "fr",
-        "french": "fr",
-        "français": "fr",
-        "de": "de",
-        "ger": "de",
-        "deu": "de",
-        "german": "de",
-        "deutsch": "de",
-        "it": "it",
-        "ita": "it",
-        "italian": "it",
-        "italiano": "it",
-        "pt": "pt",
-        "por": "pt",
-        "portuguese": "pt",
-        "português": "pt",
-        "ru": "ru",
-        "rus": "ru",
-        "russian": "ru",
-        "ja": "ja",
-        "jpn": "ja",
-        "japanese": "ja",
-        "zh": "zh",
-        "chi": "zh",
-        "zho": "zh",
-        "chinese": "zh",
-    }
-
-    return mapping.get(lang, lang[:2] if len(lang) >= 2 else "")
+    return _LANGUAGE_CODE_MAP.get(lang, lang[:2] if len(lang) >= 2 else "")

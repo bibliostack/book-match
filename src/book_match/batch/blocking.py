@@ -10,6 +10,7 @@ import re
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from book_match.core.exceptions import InvalidISBNError
 from book_match.matching.normalizers import TITLE_ARTICLES, normalize_language
 
 if TYPE_CHECKING:
@@ -67,7 +68,7 @@ class FirstAuthorSurname(BlockingRule):
 
         # Normalize
         surname = surname.lower()
-        surname = re.sub(r"[^a-z]", "", surname)
+        surname = re.sub(r"[^\w]", "", surname)
 
         return surname if surname else None
 
@@ -81,7 +82,7 @@ class TitlePrefix(BlockingRule):
             (English, Spanish, French, German)
     """
 
-    def __init__(self, prefix_length: int = 4, strip_articles: bool = True):
+    def __init__(self, prefix_length: int = 4, strip_articles: bool = True) -> None:
         self.prefix_length = prefix_length
         self.strip_articles = strip_articles
         self._article_pattern = re.compile(
@@ -103,7 +104,7 @@ class TitlePrefix(BlockingRule):
 
         # Normalize: lowercase, remove non-alphanumeric
         title = title.lower()
-        title = re.sub(r"[^a-z0-9]", "", title)
+        title = re.sub(r"[^\w]", "", title)
 
         if len(title) < self.prefix_length:
             return title if title else None
@@ -128,7 +129,7 @@ class TitleFirstWord(BlockingRule):
             return None
 
         # Split into words
-        words = re.findall(r"[a-zA-Z]+", book.title.lower())
+        words = re.findall(r"[\w]+", book.title.lower())
 
         # Skip articles
         for word in words:
@@ -145,7 +146,7 @@ class ISBN13Prefix(BlockingRule):
     Uses first 7 digits of ISBN-13 (978/979 + group + publisher).
     """
 
-    def __init__(self, prefix_length: int = 7):
+    def __init__(self, prefix_length: int = 7) -> None:
         self.prefix_length = prefix_length
 
     @property
@@ -162,7 +163,7 @@ class ISBN13Prefix(BlockingRule):
 
                 try:
                     isbn = isbn10_to_isbn13(book.isbn_10, validate=False)
-                except Exception:
+                except (InvalidISBNError, ValueError):
                     return None
 
         if not isbn:
@@ -185,7 +186,7 @@ class YearRange(BlockingRule):
         range_size: Size of year ranges (default 5)
     """
 
-    def __init__(self, range_size: int = 5):
+    def __init__(self, range_size: int = 5) -> None:
         self.range_size = range_size
 
     @property
@@ -232,7 +233,7 @@ class CompositeBlock(BlockingRule):
         rules: list[BlockingRule],
         separator: str = "|",
         require_all: bool = True,
-    ):
+    ) -> None:
         self.rules = rules
         self.separator = separator
         self.require_all = require_all
@@ -257,13 +258,13 @@ class CompositeBlock(BlockingRule):
 
 
 # Default blocking rules for common use cases
-DEFAULT_DEDUP_RULES = [
+DEFAULT_DEDUP_RULES: tuple[BlockingRule, ...] = (
     TitlePrefix(4),
     FirstAuthorSurname(),
-]
+)
 
-DEFAULT_LINK_RULES = [
+DEFAULT_LINK_RULES: tuple[BlockingRule, ...] = (
     TitleFirstWord(),
     FirstAuthorSurname(),
     ISBN13Prefix(7),
-]
+)

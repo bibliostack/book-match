@@ -64,6 +64,12 @@ class Book:
     year: int | None = None
     publisher: str | None = None
     
+    # Enrichment metadata from sources
+    description: str | None = None
+    cover_url: str | None = None
+    subjects: tuple[str, ...] = ()
+    page_count: int | None = None
+
     # For tracking provenance
     source: str | None = None
     source_id: str | None = None
@@ -85,6 +91,7 @@ class MatchResult:
     confidence: float            # 0.0 to 1.0
     verdict: MatchVerdict        # AUTO_ACCEPT, REVIEW, REJECT
     factors: tuple[MatchFactor, ...]
+    kind: MatchKind = MatchKind.UNCERTAIN
     explanation: str             # human-readable summary
     local_book: Book
     remote_book: Book
@@ -351,5 +358,5 @@ for factor in result.factors:
 
 **Optional:**
 - `httpx>=0.25`: Async HTTP client for metadata source integrations
-- `pandas>=2.0`: DataFrame integration for batch processing
-- `tqdm>=4.0`: Progress bars
+- `pandas>=2.0`: DataFrame integration for batch processing — **Planned (not yet implemented)**
+- `tqdm>=4.0`: Progress bars — **Planned (not yet implemented)**

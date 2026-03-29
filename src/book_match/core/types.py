@@ -80,9 +80,10 @@ class Book:
         return f"{self.authors[0]} et al."
 
     def with_updates(self, **kwargs: str | int | tuple[str, ...] | None) -> Book:
-        """Create a new Book with updated fields.
+        """Create a new Book with the specified fields updated.
 
-        Uses dataclasses.replace for type-safe field updates.
+        Note: Field types are not validated at compile time due to kwargs.
+        Callers should ensure values match the declared field types.
         """
         return replace(self, **kwargs)  # type: ignore[arg-type]
 
