@@ -26,6 +26,17 @@ from book_match.matching.similarity import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+_SIMILARITY_FNS: dict[str, Callable[[str, str], float]] = {
+    "jaro_winkler": jaro_winkler_similarity,
+    "token_set": token_set_ratio,
+    "hybrid": hybrid_similarity,
+}
+
+# Scoring constants
+_ENRICHMENT_SIMILARITY = 0.1  # Score when remote provides data the local record lacks
+_NEUTRAL_SIMILARITY = 0.5  # Score when data is absent from both sides (no signal)
+MAX_AUTHORS = 50  # Cap on author list length for pairwise comparison
+
 
 class BookMatcher:
     """Core book matching engine.
@@ -57,7 +68,7 @@ class BookMatcher:
         "Strong match (87% confidence). Title excellent match..."
     """
 
-    def __init__(self, config: MatchConfig | None = None):
+    def __init__(self, config: MatchConfig | None = None) -> None:
         """Initialize the matcher.
 
         Args:
@@ -71,19 +82,11 @@ class BookMatcher:
 
     def _get_title_similarity_fn(self) -> Callable[[str, str], float]:
         """Get the title similarity function based on config."""
-        if self.config.title_algorithm == "jaro_winkler":
-            return jaro_winkler_similarity
-        elif self.config.title_algorithm == "token_set":
-            return token_set_ratio
-        else:  # hybrid
-            return hybrid_similarity
+        return _SIMILARITY_FNS.get(self.config.title_algorithm, hybrid_similarity)
 
     def _get_author_similarity_fn(self) -> Callable[[str, str], float]:
         """Get the author similarity function based on config."""
-        if self.config.author_algorithm == "jaro_winkler":
-            return jaro_winkler_similarity
-        else:  # token_set
-            return token_set_ratio
+        return _SIMILARITY_FNS.get(self.config.author_algorithm, jaro_winkler_similarity)
 
     def _compare_titles(
         self,
@@ -112,9 +115,9 @@ class BookMatcher:
             # Remote provides title we don't have
             return MatchFactor(
                 name="title",
-                similarity=0.1,  # Small bonus for adding data
+                similarity=_ENRICHMENT_SIMILARITY,
                 weight=self.config.title_weight,
-                contribution=0.1 * self.config.title_weight,
+                contribution=_ENRICHMENT_SIMILARITY * self.config.title_weight,
                 details="Remote provides missing title",
                 matched_values=(None, remote_title),
             )
@@ -187,9 +190,9 @@ class BookMatcher:
         if not local_authors:
             return MatchFactor(
                 name="author",
-                similarity=0.1,
+                similarity=_ENRICHMENT_SIMILARITY,
                 weight=self.config.author_weight,
-                contribution=0.1 * self.config.author_weight,
+                contribution=_ENRICHMENT_SIMILARITY * self.config.author_weight,
                 details="Remote provides missing authors",
                 matched_values=(None, ", ".join(remote_authors)),
             )
@@ -219,6 +222,8 @@ class BookMatcher:
                 if len(local_list) <= len(remote_list)
                 else (remote_list, local_list)
             )
+            shorter = shorter[:MAX_AUTHORS]
+            longer = longer[:MAX_AUTHORS]
             best_scores: list[float] = []
             for author in shorter:
                 best = max(self._author_similarity(author, other) for other in longer)
@@ -251,9 +256,9 @@ class BookMatcher:
         if local_year is None or remote_year is None:
             return MatchFactor(
                 name="year",
-                similarity=0.5,  # Neutral when no data
+                similarity=_NEUTRAL_SIMILARITY,
                 weight=self.config.year_weight,
-                contribution=0.5 * self.config.year_weight,
+                contribution=_NEUTRAL_SIMILARITY * self.config.year_weight,
                 details="Year information incomplete",
                 matched_values=(
                     str(local_year) if local_year is not None else None,
@@ -297,9 +302,9 @@ class BookMatcher:
         if not local_norm or not remote_norm:
             return MatchFactor(
                 name="language",
-                similarity=0.5,  # Neutral when no data
+                similarity=_NEUTRAL_SIMILARITY,
                 weight=self.config.language_weight,
-                contribution=0.5 * self.config.language_weight,
+                contribution=_NEUTRAL_SIMILARITY * self.config.language_weight,
                 details="Language information incomplete",
                 matched_values=(local_norm or None, remote_norm or None),
             )
@@ -339,9 +344,9 @@ class BookMatcher:
         if not local_norm or not remote_norm:
             return MatchFactor(
                 name="publisher",
-                similarity=0.5,
+                similarity=_NEUTRAL_SIMILARITY,
                 weight=self.config.publisher_weight,
-                contribution=0.5 * self.config.publisher_weight,
+                contribution=_NEUTRAL_SIMILARITY * self.config.publisher_weight,
                 details="Publisher information incomplete",
                 matched_values=(local_publisher, remote_publisher),
             )
@@ -471,7 +476,8 @@ class BookMatcher:
                     verdict=verdict,
                     factors=tuple(factors),
                     explanation=generate_explanation(
-                        confidence, verdict, tuple(factors), local, remote
+                        confidence, verdict, tuple(factors), local, remote,
+                        year_proximity_range=self.config.year_proximity_range,
                     ),
                     local_book=local,
                     remote_book=remote,
@@ -497,7 +503,8 @@ class BookMatcher:
                     verdict=verdict,
                     factors=tuple(factors),
                     explanation=generate_explanation(
-                        confidence, verdict, tuple(factors), local, remote
+                        confidence, verdict, tuple(factors), local, remote,
+                        year_proximity_range=self.config.year_proximity_range,
                     ),
                     local_book=local,
                     remote_book=remote,
@@ -530,11 +537,10 @@ class BookMatcher:
         # Apply series adjustment: different volumes penalize, same volumes bonus
         if series_factor is not None:
             if series_factor.similarity == 0.0:
-                # Different volumes of same series — significant penalty
-                confidence *= 0.7
+                confidence *= 0.7  # Different volumes — significant penalty
             elif series_factor.similarity == 1.0:
-                # Same volume — small bonus (capped later)
-                confidence *= 1.05
+                confidence *= 1.05  # Same volume — small bonus
+            # similarity == 0.5: series info present on only one side — no adjustment
 
         # Cap at max non-ISBN confidence
         confidence = min(confidence, self.config.max_non_isbn_confidence)
@@ -546,7 +552,10 @@ class BookMatcher:
             confidence=confidence,
             verdict=verdict,
             factors=tuple(factors),
-            explanation=generate_explanation(confidence, verdict, tuple(factors), local, remote),
+            explanation=generate_explanation(
+                confidence, verdict, tuple(factors), local, remote,
+                year_proximity_range=self.config.year_proximity_range,
+            ),
             local_book=local,
             remote_book=remote,
             kind=self._classify_kind(local, remote, factors),
@@ -650,19 +659,6 @@ class BookMatcher:
         Returns:
             Confidence score from 0.0 to 1.0
         """
-        # Quick ISBN check
-        isbn_score, _ = isbn_match_score(
-            local.isbn_10,
-            local.isbn_13,
-            remote.isbn_10,
-            remote.isbn_13,
-        )
-
-        if isbn_score == 1.0:
-            return self.config.isbn_match_confidence
-        elif isbn_score == 0.0:
-            return 0.1  # ISBN mismatch
-
         # Quick title + author check
         if local.title and remote.title:
             local_title = normalize_title(local.title)
@@ -678,6 +674,33 @@ class BookMatcher:
         else:
             author_sim = 0.0
 
-        score = title_sim * self.config.title_weight + author_sim * self.config.author_weight
+        # Quick ISBN check
+        isbn_score, _ = isbn_match_score(
+            local.isbn_10,
+            local.isbn_13,
+            remote.isbn_10,
+            remote.isbn_13,
+        )
+
+        # Add neutral baseline for factors not computed in quick_score
+        neutral_contribution = 0.5 * (
+            self.config.year_weight
+            + self.config.language_weight
+            + self.config.publisher_weight
+        )
+
+        if isbn_score == 1.0:
+            return self.config.isbn_match_confidence
+        elif isbn_score == 0.0:
+            # ISBN mismatch — compute title+author score with penalty
+            base = title_sim * self.config.title_weight + author_sim * self.config.author_weight
+            weight_sum = self.config.title_weight + self.config.author_weight
+            if weight_sum > 0:
+                normalized = base / weight_sum
+            else:
+                normalized = 0.0
+            return normalized * self.config.isbn_mismatch_penalty
+
+        score = title_sim * self.config.title_weight + author_sim * self.config.author_weight + neutral_contribution
 
         return min(score, self.config.max_non_isbn_confidence)

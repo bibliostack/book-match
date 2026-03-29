@@ -10,7 +10,7 @@ from collections.abc import Sequence
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-from book_match.core.exceptions import SourceRateLimitError
+from book_match.core.exceptions import SourceError, SourceRateLimitError
 from book_match.core.types import (
     Book,
     MatchResult,
@@ -75,7 +75,7 @@ class BookResolver:
         match_config: MatchConfig | None = None,
         strategy: ResolveStrategy = ResolveStrategy.BEST_MATCH,
         min_agreeing_sources: int = 2,
-    ):
+    ) -> None:
         """Initialize the resolver.
 
         Args:
@@ -148,8 +148,11 @@ class BookResolver:
         """Query a single source with error handling."""
         try:
             return await source.search(query, limit=limit)
-        except Exception as e:
-            logger.warning("Source '%s' query failed: %s", source.name, e)
+        except SourceError as e:
+            logger.warning("Source '%s' query failed: %s", source.name, _sanitize_error(e))
+            return []
+        except Exception:
+            logger.error("Unexpected error querying source '%s'", source.name, exc_info=True)
             return []
 
     async def resolve(
@@ -235,10 +238,10 @@ class BookResolver:
         # Book is a frozen dataclass (hashable), so use set[Book] directly.
         consensus_candidates: set[Book] = set()
         for group in groups:
-            distinct_sources = {b.source for b in group if b.source}
+            distinct_sources = {book.source for book in group if book.source}
             if len(distinct_sources) >= self.min_agreeing_sources:
-                for b in group:
-                    consensus_candidates.add(b)
+                for book in group:
+                    consensus_candidates.add(book)
 
         # Filter results to only consensus candidates
         filtered = [r for r in results if r.remote_book in consensus_candidates]
@@ -368,8 +371,13 @@ class BookResolver:
         source_results = await asyncio.gather(*tasks, return_exceptions=True)
 
         candidates = []
-        for result in source_results:
-            if isinstance(result, Book) and result is not None:
+        for source, result in zip(self.sources, source_results):
+            if isinstance(result, Exception):
+                logger.warning(
+                    "Source '%s' fetch_by_isbn failed for ISBN %s: %s",
+                    source.name, clean_isbn, _sanitize_error(result),
+                )
+            elif isinstance(result, Book) and result is not None:
                 candidates.append(result)
 
         if not candidates:

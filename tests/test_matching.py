@@ -154,10 +154,16 @@ class TestQuickScore:
         remote = Book(isbn_13="9780743273565")
         assert matcher.quick_score(local, remote) == 0.98
 
-    def test_isbn_mismatch(self, matcher):
+    def test_isbn_mismatch_no_title(self, matcher):
         local = Book(isbn_13="9780306406157")
         remote = Book(isbn_13="9780743273565")
-        assert matcher.quick_score(local, remote) == 0.1
+        assert matcher.quick_score(local, remote) == 0.0
+
+    def test_isbn_mismatch_with_title(self, matcher):
+        local = Book(title="Same Book", authors=("Author",), isbn_13="9780306406157")
+        remote = Book(title="Same Book", authors=("Author",), isbn_13="9780743273565")
+        score = matcher.quick_score(local, remote)
+        assert 0.0 < score < 0.7  # penalized but not zero
 
     def test_no_isbn_title_match(self, matcher):
         local = Book(title="Same Title", authors=("Same Author",))

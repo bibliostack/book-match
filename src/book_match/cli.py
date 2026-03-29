@@ -7,10 +7,21 @@ import json
 import sys
 from typing import Any
 
+from book_match import __version__
 from book_match.batch.processor import BatchMatcher
 from book_match.core.config import BatchConfig, MatchConfig
 from book_match.core.types import Book, MatchResult
 from book_match.matching.engine import BookMatcher
+
+
+def _safe_int(value: object) -> int | None:
+    """Safely convert a value to int, returning None on failure."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return None
 
 
 def _parse_book(data: dict[str, Any]) -> Book:
@@ -24,7 +35,7 @@ def _parse_book(data: dict[str, Any]) -> Book:
         isbn_10=data.get("isbn_10"),
         isbn_13=data.get("isbn_13"),
         language=data.get("language"),
-        year=data.get("year"),
+        year=_safe_int(data.get("year")),
         publisher=data.get("publisher"),
     )
 
@@ -34,6 +45,7 @@ def _result_to_dict(result: MatchResult) -> dict[str, Any]:
     return {
         "confidence": round(result.confidence, 4),
         "verdict": result.verdict.value,
+        "kind": result.kind.value,
         "explanation": result.explanation,
         "factors": [
             {
@@ -76,6 +88,13 @@ def cmd_match(args: argparse.Namespace) -> None:
         print(f"Error: invalid JSON: {e}", file=sys.stderr)
         sys.exit(1)
 
+    if not isinstance(local_data, dict):
+        print("Error: --local must be a JSON object", file=sys.stderr)
+        sys.exit(1)
+    if not isinstance(remote_data, dict):
+        print("Error: --remote must be a JSON object", file=sys.stderr)
+        sys.exit(1)
+
     local = _parse_book(local_data)
     remote = _parse_book(remote_data)
     config = _get_config(args.config)
@@ -114,7 +133,12 @@ def cmd_dedup(args: argparse.Namespace) -> None:
         print("Error: input must be a JSON array of book objects", file=sys.stderr)
         sys.exit(1)
 
-    books = [_parse_book(b) for b in raw_books]
+    books = []
+    for i, book_data in enumerate(raw_books):
+        if not isinstance(book_data, dict):
+            print(f"Warning: skipping non-object at index {i}", file=sys.stderr)
+            continue
+        books.append(_parse_book(book_data))
     config = _get_config(args.config)
     matcher = BookMatcher(config)
     batch = BatchMatcher(matcher=matcher, batch_config=BatchConfig())
@@ -139,12 +163,91 @@ def cmd_dedup(args: argparse.Namespace) -> None:
             print()
 
 
+def cmd_link(args: argparse.Namespace) -> None:
+    """Handle the 'link' subcommand."""
+    for label, path in [("--left", args.left), ("--right", args.right)]:
+        if not path:
+            print(f"Error: {label} is required", file=sys.stderr)
+            sys.exit(1)
+
+    try:
+        with open(args.left) as f:
+            raw_left = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: file not found: {args.left}", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: invalid JSON in {args.left}: {e.msg}", file=sys.stderr)
+        sys.exit(1)
+    except OSError:
+        print(f"Error: could not read file: {args.left}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        with open(args.right) as f:
+            raw_right = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: file not found: {args.right}", file=sys.stderr)
+        sys.exit(1)
+    except json.JSONDecodeError as e:
+        print(f"Error: invalid JSON in {args.right}: {e.msg}", file=sys.stderr)
+        sys.exit(1)
+    except OSError:
+        print(f"Error: could not read file: {args.right}", file=sys.stderr)
+        sys.exit(1)
+
+    if not isinstance(raw_left, list):
+        print("Error: left input must be a JSON array of book objects", file=sys.stderr)
+        sys.exit(1)
+    if not isinstance(raw_right, list):
+        print("Error: right input must be a JSON array of book objects", file=sys.stderr)
+        sys.exit(1)
+
+    left_books = []
+    for i, book_data in enumerate(raw_left):
+        if not isinstance(book_data, dict):
+            print(f"Warning: skipping non-object at index {i} in left dataset", file=sys.stderr)
+            continue
+        left_books.append(_parse_book(book_data))
+
+    right_books = []
+    for i, book_data in enumerate(raw_right):
+        if not isinstance(book_data, dict):
+            print(f"Warning: skipping non-object at index {i} in right dataset", file=sys.stderr)
+            continue
+        right_books.append(_parse_book(book_data))
+
+    config = _get_config(args.config)
+    matcher = BookMatcher(config)
+    batch = BatchMatcher(matcher=matcher, batch_config=BatchConfig())
+
+    results = list(batch.link(left_books, right_books))
+
+    if args.json or args.output:
+        output_data = [_result_to_dict(r) for r in results]
+        output_str = json.dumps(output_data, indent=2)
+        if args.output:
+            with open(args.output, "w") as f:
+                f.write(output_str)
+            print(f"Found {len(results)} links. Written to {args.output}")
+        else:
+            print(output_str)
+    else:
+        print(f"Found {len(results)} links:\n")
+        for i, result in enumerate(results, 1):
+            print(f"{i}. {result.confidence:.0%} - {result.explanation}")
+            print(f"   Left:  {result.local_book.title} by {result.local_book.display_authors}")
+            print(f"   Right: {result.remote_book.title} by {result.remote_book.display_authors}")
+            print()
+
+
 def main() -> None:
     """Main entry point for the CLI."""
     parser = argparse.ArgumentParser(
         prog="book-match",
         description="Fast, explainable book metadata matching",
     )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # match subcommand
@@ -165,12 +268,24 @@ def main() -> None:
     )
     dedup_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
+    # link subcommand
+    link_parser = subparsers.add_parser("link", help="Link books across two datasets")
+    link_parser.add_argument("--left", required=True, help="Path to left dataset JSON file")
+    link_parser.add_argument("--right", required=True, help="Path to right dataset JSON file")
+    link_parser.add_argument(
+        "--config", choices=["strict", "lenient", "isbn-only"], help="Configuration preset"
+    )
+    link_parser.add_argument("--json", action="store_true", help="Output as JSON")
+    link_parser.add_argument("--output", help="Output file path")
+
     args = parser.parse_args()
 
     if args.command == "match":
         cmd_match(args)
     elif args.command == "dedup":
         cmd_dedup(args)
+    elif args.command == "link":
+        cmd_link(args)
     else:
         parser.print_help()
         sys.exit(1)

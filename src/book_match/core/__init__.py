@@ -17,18 +17,26 @@ from book_match.core.types import (
     BatchProgress,
     Book,
     MatchFactor,
+    MatchKind,
     MatchResult,
     MatchVerdict,
+    ResolveOutcome,
     SearchQuery,
+    SourceDiagnostic,
+    SourceStatus,
 )
 
 __all__ = [
     # Types
     "Book",
     "MatchFactor",
+    "MatchKind",
     "MatchResult",
     "MatchVerdict",
     "SearchQuery",
+    "SourceStatus",
+    "SourceDiagnostic",
+    "ResolveOutcome",
     "BatchProgress",
     # Config
     "MatchConfig",
