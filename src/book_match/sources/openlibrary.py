@@ -199,7 +199,9 @@ class OpenLibrarySource(BaseSource):
         # Subjects
         subjects: list[str] = []
         if "subject" in data and isinstance(data["subject"], list):
-            subjects = [subject_entry for subject_entry in data["subject"] if isinstance(subject_entry, str)]
+            subjects = [
+                subject_entry for subject_entry in data["subject"] if isinstance(subject_entry, str)
+            ]
         elif "subjects" in data and isinstance(data["subjects"], list):
             for subject_entry in data["subjects"]:
                 if isinstance(subject_entry, dict):
@@ -224,7 +226,9 @@ class OpenLibrarySource(BaseSource):
             publisher=(
                 data["publisher"][0]
                 if isinstance(data.get("publisher"), list) and data["publisher"]
-                else (data.get("publisher") if not isinstance(data.get("publisher"), list) else None)
+                else (
+                    data.get("publisher") if not isinstance(data.get("publisher"), list) else None
+                )
             ),
             cover_url=cover_url,
             subjects=tuple(subjects),

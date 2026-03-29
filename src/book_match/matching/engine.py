@@ -476,7 +476,11 @@ class BookMatcher:
                     verdict=verdict,
                     factors=tuple(factors),
                     explanation=generate_explanation(
-                        confidence, verdict, tuple(factors), local, remote,
+                        confidence,
+                        verdict,
+                        tuple(factors),
+                        local,
+                        remote,
                         year_proximity_range=self.config.year_proximity_range,
                     ),
                     local_book=local,
@@ -503,7 +507,11 @@ class BookMatcher:
                     verdict=verdict,
                     factors=tuple(factors),
                     explanation=generate_explanation(
-                        confidence, verdict, tuple(factors), local, remote,
+                        confidence,
+                        verdict,
+                        tuple(factors),
+                        local,
+                        remote,
                         year_proximity_range=self.config.year_proximity_range,
                     ),
                     local_book=local,
@@ -553,7 +561,11 @@ class BookMatcher:
             verdict=verdict,
             factors=tuple(factors),
             explanation=generate_explanation(
-                confidence, verdict, tuple(factors), local, remote,
+                confidence,
+                verdict,
+                tuple(factors),
+                local,
+                remote,
                 year_proximity_range=self.config.year_proximity_range,
             ),
             local_book=local,
@@ -684,9 +696,7 @@ class BookMatcher:
 
         # Add neutral baseline for factors not computed in quick_score
         neutral_contribution = _NEUTRAL_SIMILARITY * (
-            self.config.year_weight
-            + self.config.language_weight
-            + self.config.publisher_weight
+            self.config.year_weight + self.config.language_weight + self.config.publisher_weight
         )
 
         if isbn_score == 1.0:
@@ -701,6 +711,10 @@ class BookMatcher:
                 normalized = 0.0
             return normalized * self.config.isbn_mismatch_penalty
 
-        score = title_sim * self.config.title_weight + author_sim * self.config.author_weight + neutral_contribution
+        score = (
+            title_sim * self.config.title_weight
+            + author_sim * self.config.author_weight
+            + neutral_contribution
+        )
 
         return min(score, self.config.max_non_isbn_confidence)

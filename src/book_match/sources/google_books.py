@@ -321,13 +321,17 @@ class GoogleBooksSource(BaseSource):
                 return None
             logger.warning(
                 "Source '%s' fetch_by_id failed for id=%s: HTTP %s",
-                self.name, source_id, e.response.status_code,
+                self.name,
+                source_id,
+                e.response.status_code,
             )
             return None
         except httpx.RequestError as e:
             logger.warning(
                 "Source '%s' fetch_by_id network error for id=%s: %s",
-                self.name, source_id, e,
+                self.name,
+                source_id,
+                e,
             )
             return None
 

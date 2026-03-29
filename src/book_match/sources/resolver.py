@@ -375,7 +375,9 @@ class BookResolver:
             if isinstance(result, Exception):
                 logger.warning(
                     "Source '%s' fetch_by_isbn failed for ISBN %s: %s",
-                    source.name, clean_isbn, _sanitize_error(result),
+                    source.name,
+                    clean_isbn,
+                    _sanitize_error(result),
                 )
             elif isinstance(result, Book) and result is not None:
                 candidates.append(result)
