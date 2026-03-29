@@ -203,6 +203,8 @@ def generate_explanation(
         factors: Individual match factors
         local_book: The local book being matched
         remote_book: The remote candidate book
+        year_proximity_range: Years within this range are described as "close".
+            Should match MatchConfig.year_proximity_range for consistency.
 
     Returns:
         Multi-sentence human-readable explanation

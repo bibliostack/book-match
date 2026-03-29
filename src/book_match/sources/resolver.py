@@ -371,7 +371,7 @@ class BookResolver:
         source_results = await asyncio.gather(*tasks, return_exceptions=True)
 
         candidates = []
-        for source, result in zip(self.sources, source_results):
+        for source, result in zip(self.sources, source_results, strict=True):
             if isinstance(result, Exception):
                 logger.warning(
                     "Source '%s' fetch_by_isbn failed for ISBN %s: %s",

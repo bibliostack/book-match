@@ -683,7 +683,7 @@ class BookMatcher:
         )
 
         # Add neutral baseline for factors not computed in quick_score
-        neutral_contribution = 0.5 * (
+        neutral_contribution = _NEUTRAL_SIMILARITY * (
             self.config.year_weight
             + self.config.language_weight
             + self.config.publisher_weight

@@ -281,7 +281,7 @@ normalized = validate_isbn("0-306-40615-2")  # "0306406152"
 try:
     validate_isbn("1234567890")
 except InvalidISBNError as e:
-    print(e)  # "Invalid ISBN: invalid ISBN-10 checksum"
+    print(e)  # "Invalid ISBN: 1234567890 (invalid ISBN-10 checksum)"
 
 # Conversion
 isbn10_to_isbn13("0306406152")  # "9780306406157"

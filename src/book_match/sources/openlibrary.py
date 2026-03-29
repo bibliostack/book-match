@@ -224,7 +224,7 @@ class OpenLibrarySource(BaseSource):
             publisher=(
                 data["publisher"][0]
                 if isinstance(data.get("publisher"), list) and data["publisher"]
-                else data.get("publisher")
+                else (data.get("publisher") if not isinstance(data.get("publisher"), list) else None)
             ),
             cover_url=cover_url,
             subjects=tuple(subjects),
