@@ -1,6 +1,51 @@
 # CHANGELOG
 
 
+## v1.2.1 (2026-03-29)
+
+### Bug Fixes
+
+- Comprehensive codebase audit remediation (42 fixes)
+  ([#67](https://github.com/bibliostack/book-match/pull/67),
+  [`53bc9cd`](https://github.com/bibliostack/book-match/commit/53bc9cdc4c1fcbf33b23d04f6a30a4a7416714b1))
+
+* fix: comprehensive codebase audit remediation (42 fixes)
+
+Full 21-agent codebase audit identified 68 findings across 14 domains. This commit remediates 42 of
+  them (11 critical, 25 warning, 6 nitpick).
+
+Critical fixes: - Fix README docs: validate_isbn() return type, result.kind field name - Fix silent
+  error swallowing in resolve_by_isbn and _query_source - Sanitize API key in warning logs (prevent
+  credential leakage) - Fix misleading year explanations when year data is None - Forward
+  year_proximity_range through explanation pipeline - CLI: safely coerce year from JSON, handle
+  non-dict items - Fix quick_score false negatives for ISBN-mismatch pairs - Unicode-aware blocking
+  rules (support CJK/Arabic/Cyrillic) - Protect HTTP client lifecycle with asyncio.Lock
+
+Warning fixes: - Add neutral reason codes (YEAR_UNKNOWN, LANGUAGE_UNKNOWN) - Fix _request params
+  type annotation (dict[str, Any]) - Add missing exports to core, matching, isbn, top-level __init__
+  - Convert mutable default rule lists to immutable tuples - Add -> None annotations on all __init__
+  methods - Cap author list comparison at 50 (prevent O(n^2) abuse) - Add CLI link subcommand,
+  --version flag, kind in JSON output - Update ARCHITECTURE.md (Book fields, MatchResult.kind, deps)
+  - Narrow exception handling in blocking (InvalidISBNError only) - Log non-404 HTTP errors in
+  fetch_by_id - Escalate parse errors from DEBUG to WARNING
+
+Nitpick fixes: - Extract scoring constants (_ENRICHMENT_SIMILARITY, _NEUTRAL_SIMILARITY) - Replace
+  if/elif dispatch with registry dict for similarity functions - Hoist language mapping to
+  module-level constant - Pin CI/CD actions to full commit SHAs (supply-chain hardening) - Fix
+  IndexError risk on empty publisher list - Rename single-letter variables (s→subject_entry, b→book)
+
+* fix: address PR review comments and lint failure
+
+- Fix ruff B905: add strict=True to zip() in resolve_by_isbn - Fix README example: match actual
+  InvalidISBNError format - Fix openlibrary publisher: return None for empty list (not []) - Use
+  _NEUTRAL_SIMILARITY constant in quick_score neutral baseline - Add year_proximity_range to
+  generate_explanation docstring
+
+* style: apply ruff format to 4 files
+
+* fix: resolve mypy errors in _safe_int type narrowing
+
+
 ## v1.2.0 (2026-03-09)
 
 ### Bug Fixes
@@ -38,14 +83,16 @@ Replace broken PyPI badge with CI status badge, use dynamic shields.io badges fo
 
 * feat: extract cover_url, subjects, page_count in OpenLibrarySource
 
-* Use `is None` instead of `or` for page_count fallback to handle 0 correctly, and request
-  `cover_i`, `subject`, and `number_of_pages_median` in the OpenLibrary search fields parameter.
+* fix: use explicit None check for page_count and request new fields in search
 
-* feat: address PR review comments
+- Use `is None` instead of `or` for page_count fallback to handle 0 correctly - Add cover_i,
+  subject, number_of_pages_median to OpenLibrary search fields param
 
-- Move imports to top of test file (fixes E402 lint error)
-- Guard `cover_i` against `None` values to prevent invalid URLs
-- Add test for `page_count=0` edge case
+* fix: address PR review comments
+
+- Move imports to top of test file (fixes E402 lint error) - Guard cover_i against None values to
+  prevent invalid URLs - Add test for page_count=0 edge case
+
 
 ## v1.0.0 (2026-03-08)
 
