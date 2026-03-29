@@ -14,14 +14,18 @@ from book_match.core.types import Book, MatchResult
 from book_match.matching.engine import BookMatcher
 
 
-def _safe_int(value: object) -> int | None:
+def _safe_int(value: Any) -> int | None:
     """Safely convert a value to int, returning None on failure."""
     if value is None:
         return None
-    try:
-        return int(value)
-    except (ValueError, TypeError):
-        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return None
+    return None
 
 
 def _parse_book(data: dict[str, Any]) -> Book:
